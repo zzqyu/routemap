@@ -1,19 +1,22 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  min-height: 100vh;
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  height: 100vh;
   background: #eef1f5;
   color: #111827;
+  overflow: hidden;
 }
 
 .control-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 28px;
+  gap: 14px;
+  padding: 20px;
   background: #ffffff;
   border-right: 1px solid #d8dde6;
   box-shadow: 12px 0 30px rgba(15, 23, 42, 0.07);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .eyebrow {
@@ -54,6 +57,53 @@ h2 {
   font-size: 13px;
   font-weight: 800;
   text-align: left;
+}
+
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-group {
+  border: 1px solid #d8dde6;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.panel-group summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+.panel-group[open] summary {
+  margin-bottom: 12px;
+}
+
+.panel-group .field + .field {
+  margin-top: 10px;
+}
+
+.mini-reset {
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mini-reset:hover {
+  border-color: #0050a4;
+  color: #0050a4;
 }
 
 .field input,
@@ -132,6 +182,124 @@ h2 {
   flex-direction: column;
   gap: 18px;
   padding: 28px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: #ffffff;
+  border-left: 1px solid #d8dde6;
+  box-shadow: -12px 0 30px rgba(15, 23, 42, 0.05);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.station-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.station-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.station-item small {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.station-item.active {
+  border-color: #0b5bd3;
+  background: linear-gradient(0deg, #dbeafe 0%, #eff6ff 100%);
+  box-shadow: 0 0 0 1px #93c5fd inset;
+}
+
+.station-item.in-map {
+  background: #eefbf4;
+  border-color: #8ad3ab;
+}
+
+.station-item.out-map {
+  background: #f8fafc;
+}
+
+.station-item.start-item {
+  margin-top: 12px;
+}
+
+.station-item.end-item {
+  margin-bottom: 12px;
+}
+
+.station-item.start-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -9px;
+  border-top: 2px solid #1d4ed8;
+}
+
+.station-item.end-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  border-bottom: 2px solid #dc2626;
+}
+
+.item-comment {
+  position: absolute;
+  right: 8px;
+  color: #475569;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0 4px;
+  background: #fff;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.item-comment.top {
+  top: -18px;
+}
+
+.item-comment.bottom {
+  bottom: -18px;
+}
+
+.station-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #d1d5db;
 }
 
 .preview-header {
@@ -162,6 +330,33 @@ h2 {
   background-size: 20px 20px;
 }
 
+.preview-export-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.preview-export-actions button {
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.preview-export-actions button:hover:not(:disabled) {
+  border-color: #0050a4;
+  background: #0050a4;
+  color: #fff;
+}
+
+.preview-export-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .route-map {
   display: block;
   width: min(100%, 1100px);
@@ -181,5 +376,10 @@ h2 {
   .control-panel {
     border-right: 0;
     border-bottom: 1px solid #d8dde6;
+  }
+
+  .edit-panel {
+    border-left: 0;
+    border-top: 1px solid #d8dde6;
   }
 }
