@@ -1406,6 +1406,7 @@ function App() {
 
         <details className="panel-group route-group" open={activeStage === 'route' || activeStage === 'global'}>
           <summary>기본 설정</summary>
+          <h3 className="panel-title">기본 설정 편집</h3>
           <label className="field">
             노선 검색
             <input
@@ -1513,6 +1514,7 @@ function App() {
 
         <details className="panel-group layout-group" open={activeStage === 'layout'}>
           <summary>레이아웃 조정</summary>
+          <h3 className="panel-title">레이아웃 편집</h3>
           {layoutWarnings.length > 0 && (
             <div className="layout-warning-box">
               <p className="layout-warning-title">충돌/가독성 경고 {layoutWarnings.length}건</p>
@@ -1776,6 +1778,7 @@ function App() {
 
       <aside className={`edit-panel ${mobileEditTab === 'stations' ? '' : 'mobile-hidden'}`}>
         <div className="edit-panel-top">
+          <h3 className="panel-title">정류장 목록 편집</h3>
           <label className="field">
             사용자 정의 정류장 추가
             <input value={newStationName} onChange={(event) => { touchStage('stationBasic'); setNewStationName(event.target.value); }} placeholder="정류장명 입력" />
