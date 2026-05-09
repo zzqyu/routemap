@@ -19,10 +19,12 @@ const port = Number(process.env.API_PORT ?? process.env.PORT ?? 5174);
 app.use(cors());
 app.use(express.json());
 
+const dbFilename = `file:${dbPath}?mode=ro&immutable=1`;
+
 const dbPromise = open({
-  filename: dbPath,
+  filename: dbFilename,
   driver: sqlite3.Database,
-  mode: sqlite3.OPEN_READONLY,
+  mode: sqlite3.OPEN_READONLY | sqlite3.OPEN_URI,
 });
 
 function normalizeDirection(value) {
