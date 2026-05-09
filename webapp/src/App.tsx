@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 
 type Direction = '상행' | '하행';
@@ -86,6 +86,31 @@ type StationListItem = {
   isCustom?: boolean;
 };
 
+type StageKey = 'route' | 'global' | 'stationBasic' | 'layout' | 'stationAdvanced' | 'export';
+
+type StageTouched = Record<StageKey, boolean>;
+
+type LayoutWarning = {
+  id: 'lineSpan' | 'labelDensity' | 'cornerGap';
+  title: string;
+  detail: string;
+};
+
+type HighlightKey = 'header' | 'terminal' | 'line' | 'labels' | 'station' | 'segment' | 'routeName' | null;
+
+type HistorySnapshot = {
+  themeName: ThemeName | '';
+  headerLogo: HeaderLogoKey | '';
+  customTerminalText: string;
+  layoutOverride: LayoutOverride;
+  stationOverrides: Record<string, StationOverride>;
+  stationCatalog: StationListItem[];
+  selectedStationId: string;
+};
+
+type ExportFormat = 'svg' | 'png';
+type MobileEditTab = 'settings' | 'layout' | 'stations';
+
 function buildDisplayedStations(
   stations: RouteStation[],
   stationOverrides: Record<string, StationOverride>,
@@ -159,6 +184,7 @@ const turnRadius = 14;
 const routeLineStrokeWidth = 3.2;
 const lineStartX = leftPad;
 const lineEndX = canvasWidth - rightPad;
+const highlightColor = '#facc15';
 
 const defaultLayoutOverride: LayoutOverride = {
   labelAngle: -52,
@@ -428,6 +454,7 @@ function RouteMapPreview({
   headerLogoKey,
   headerLogo,
   terminalText,
+  highlightKey,
   onSelectStation,
   svgRef,
 }: {
@@ -443,6 +470,7 @@ function RouteMapPreview({
   headerLogoKey: HeaderLogoKey;
   headerLogo: HeaderLogoOption;
   terminalText: string;
+  highlightKey: HighlightKey;
   onSelectStation: (stationId: string) => void;
   svgRef: React.RefObject<SVGSVGElement | null>;
 }) {
@@ -526,7 +554,7 @@ function RouteMapPreview({
       </defs>
       <rect x="0" y="0" width={canvasWidth} height={layout.height} fill="#fff" />
       {headerLogo.showHeaderAccent && <path d={`M 180 ${topPadding} H 320 Q 250 ${topPadding + 27} 180 ${topPadding}`} fill={theme.headerAccentColor} opacity="0.95" />}
-      <text x="14" y={topPadding + 21} fontSize="10" fontWeight="800" fill={theme.routeNumberColor}>
+      <text x="14" y={topPadding + 21} fontSize="10" fontWeight="800" fill={highlightKey === 'terminal' ? highlightColor : theme.routeNumberColor}>
         {terminalText}
       </text>
       <text x="14" y={topPadding + 28} fontSize="4.8" fontWeight="700" fill="#111">
@@ -542,7 +570,7 @@ function RouteMapPreview({
         </text>
       ))}
 
-      <g transform={`translate(250 ${topPadding + 36})`}>
+      <g transform={`translate(250 ${topPadding + 36})`} opacity={highlightKey === 'header' ? 1 : 0.96}>
         <image
           href={headerLogo.src}
           x={headerLogo.x}
@@ -565,12 +593,17 @@ function RouteMapPreview({
           preserveAspectRatio="xMidYMid meet"
         />
       )}
-      <text x={routeNameRightX} y={routeNameY} textAnchor="end" fontSize={routeNameFontSize} fontWeight="900" fill={theme.routeNumberColor}>
+      <text x={routeNameRightX} y={routeNameY} textAnchor="end" fontSize={routeNameFontSize} fontWeight="900" fill={highlightKey === 'routeName' ? highlightColor : theme.routeNumberColor}>
         {displayRouteName}
       </text>
 
       {routePath && (
-        <path d={routePath} fill="none" stroke={theme.lineColor} strokeWidth={layoutOverride.lineStrokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+        <>
+          <path d={routePath} fill="none" stroke={theme.lineColor} strokeWidth={layoutOverride.lineStrokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+          {highlightKey === 'line' && (
+            <path d={routePath} fill="none" stroke={highlightColor} strokeWidth={Math.max(layoutOverride.lineStrokeWidth + 1.6, 4.2)} strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+          )}
+        </>
       )}
 
       {connectorPath && (
@@ -600,8 +633,20 @@ function RouteMapPreview({
         const subwayColor = override?.subwayColor ?? '#a855f7';
         const subwayLabel = (override?.subwayLabelText ?? '지').slice(0, 2);
         const isSelected = selectedStationId === String(point.stationId);
+        const isStationHighlighted = highlightKey === 'station' && isEmphasis;
         return (
           <g key={`${point.stationId}-${point.staOrder}`} onClick={() => onSelectStation(String(point.stationId))} style={{ cursor: 'pointer' }}>
+            {isStationHighlighted && (
+              <circle
+                cx={point.xPos}
+                cy={point.yPos}
+                r={layoutOverride.terminalMarkerRadius + 1.8}
+                fill="none"
+                stroke={highlightColor}
+                strokeWidth="1.8"
+                opacity="0.85"
+              />
+            )}
             {pointMode === 'intercityTransfer' ? (
               <g>
                 {(() => {
@@ -676,7 +721,7 @@ function RouteMapPreview({
               textAnchor="start"
               fontSize={labelSize}
               fontWeight={labelWeight}
-              fill="#111"
+              fill={highlightKey === 'labels' ? highlightColor : '#111'}
             >
               {label.lines.map((line, index) => (
                 <tspan key={`${point.stationId}-line-${index}`} x={labelX} dy={index === 0 ? 0 : lineHeight}>
@@ -701,7 +746,7 @@ function RouteMapPreview({
         const midX = (point.xPos + next.xPos) / 2;
         const textY = Math.min(point.yPos, next.yPos) - 8;
         return (
-          <text key={`segment-label-${point.stationId}-${next.stationId}`} x={midX} y={textY} textAnchor="middle" fontSize="4.4" fontWeight="800" fill="#374151">
+          <text key={`segment-label-${point.stationId}-${next.stationId}`} x={midX} y={textY} textAnchor="middle" fontSize="4.4" fontWeight="800" fill={highlightKey === 'segment' ? highlightColor : '#374151'}>
             {label}
           </text>
         );
@@ -711,12 +756,12 @@ function RouteMapPreview({
 }
 
 function App() {
-  const [query, setQuery] = useState('300');
+  const [query, setQuery] = useState('');
   const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const direction: Direction = '상행';
-  const [themeName, setThemeName] = useState<ThemeName>('teal');
-  const [headerLogo, setHeaderLogo] = useState<HeaderLogoKey>('gbus');
+  const [themeName, setThemeName] = useState<ThemeName | ''>('');
+  const [headerLogo, setHeaderLogo] = useState<HeaderLogoKey | ''>('');
   const [layoutOverride, setLayoutOverride] = useState<LayoutOverride>(defaultLayoutOverride);
   const [stationOverrides, setStationOverrides] = useState<Record<string, StationOverride>>({});
   const [selectedStationId, setSelectedStationId] = useState<string>('');
@@ -724,10 +769,123 @@ function App() {
   const [headerLogoDataUrl, setHeaderLogoDataUrl] = useState('');
   const [mbusMarkDataUrl, setMbusMarkDataUrl] = useState('');
   const [newStationName, setNewStationName] = useState('');
+  const [stationSearch, setStationSearch] = useState('');
+  const [filterInMapOnly, setFilterInMapOnly] = useState(false);
+  const [filterCustomOnly, setFilterCustomOnly] = useState(false);
   const [detail, setDetail] = useState<RouteDetailResponse | null>(null);
   const [customTerminalText, setCustomTerminalText] = useState('');
   const [message, setMessage] = useState('');
+  const [activeStage, setActiveStage] = useState<StageKey>('route');
+  const [highlightKey, setHighlightKey] = useState<HighlightKey>(null);
+  const [historyPast, setHistoryPast] = useState<HistorySnapshot[]>([]);
+  const [historyFuture, setHistoryFuture] = useState<HistorySnapshot[]>([]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [mobileEditTab, setMobileEditTab] = useState<MobileEditTab>('settings');
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
+  const [exportScale, setExportScale] = useState(3);
+  const [exportFileName, setExportFileName] = useState('');
+  const [exportWhiteBg, setExportWhiteBg] = useState(true);
+  const [stageTouched, setStageTouched] = useState<StageTouched>({
+    route: false,
+    global: false,
+    stationBasic: false,
+    layout: false,
+    stationAdvanced: false,
+    export: false,
+  });
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
+  const snapshotRef = useRef<HistorySnapshot | null>(null);
+  const selectedHeaderLogo: HeaderLogoKey = headerLogo || 'gbus';
+
+  function touchStage(stage: StageKey) {
+    setStageTouched((prev) => (prev[stage] ? prev : { ...prev, [stage]: true }));
+  }
+
+  function pulseHighlight(key: Exclude<HighlightKey, null>) {
+    setHighlightKey(key);
+    if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = window.setTimeout(() => setHighlightKey(null), 900);
+  }
+
+  const cloneSnapshot = useCallback((): HistorySnapshot => {
+    return {
+      themeName,
+      headerLogo,
+      customTerminalText,
+      layoutOverride: { ...layoutOverride },
+      stationOverrides: JSON.parse(JSON.stringify(stationOverrides)),
+      stationCatalog: stationCatalog.map((item) => ({ ...item, directions: [...item.directions] })),
+      selectedStationId,
+    };
+  }, [themeName, headerLogo, customTerminalText, layoutOverride, stationOverrides, stationCatalog, selectedStationId]);
+
+  const applySnapshot = useCallback((snapshot: HistorySnapshot) => {
+    setThemeName(snapshot.themeName);
+    setHeaderLogo(snapshot.headerLogo);
+    setCustomTerminalText(snapshot.customTerminalText);
+    setLayoutOverride(snapshot.layoutOverride);
+    setStationOverrides(snapshot.stationOverrides);
+    setStationCatalog(snapshot.stationCatalog);
+    setSelectedStationId(snapshot.selectedStationId);
+  }, []);
+
+  function commitHistory() {
+    const current = snapshotRef.current;
+    if (!current) return;
+    setHistoryPast((prev) => [...prev.slice(-79), current]);
+    setHistoryFuture([]);
+  }
+
+  const undoHistory = useCallback(() => {
+    setHistoryPast((prev) => {
+      if (!prev.length) return prev;
+      const current = snapshotRef.current;
+      const nextPast = [...prev];
+      const target = nextPast.pop() as HistorySnapshot;
+      if (current) setHistoryFuture((future) => [...future, current]);
+      applySnapshot(target);
+      return nextPast;
+    });
+  }, [applySnapshot]);
+
+  const redoHistory = useCallback(() => {
+    setHistoryFuture((prev) => {
+      if (!prev.length) return prev;
+      const current = snapshotRef.current;
+      const nextFuture = [...prev];
+      const target = nextFuture.pop() as HistorySnapshot;
+      if (current) setHistoryPast((past) => [...past.slice(-79), current]);
+      applySnapshot(target);
+      return nextFuture;
+    });
+  }, [applySnapshot]);
+
+  useEffect(() => {
+    snapshotRef.current = cloneSnapshot();
+  }, [cloneSnapshot]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const isMod = event.metaKey || event.ctrlKey;
+      if (!isMod) return;
+
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        undoHistory();
+        return;
+      }
+
+      if ((key === 'z' && event.shiftKey) || key === 'y') {
+        event.preventDefault();
+        redoHistory();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undoHistory, redoHistory]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -735,7 +893,6 @@ function App() {
       .then((res) => res.json())
       .then((data: RouteSummary[]) => {
         setRoutes(data);
-        if (!selectedRouteId && data[0]) setSelectedRouteId(String(data[0].routeId));
       })
       .catch((error) => {
         if (error.name !== 'AbortError') setMessage(`노선 검색 실패: ${error.message}`);
@@ -760,7 +917,7 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(headerLogoOptions[headerLogo].src)
+    fetch(headerLogoOptions[selectedHeaderLogo].src)
       .then((response) => (response.ok ? response.blob() : null))
       .then((blob) => {
         if (!blob) return;
@@ -780,7 +937,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [headerLogo]);
+  }, [selectedHeaderLogo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -844,7 +1001,7 @@ function App() {
     });
   }, [selectedRouteId]);
 
-  const theme = themes[themeName];
+  const theme = themes[themeName || 'teal'];
   const terminalText = customTerminalText.trim() || (detail ? formatTerminal(detail.route, detail.direction) : '출발지 - 목적지');
   const baseEndpoints = detail?.route ? getEndpointIds(detail.route, direction) : { startId: '', endId: '' };
   const overrideStartId = Object.entries(stationOverrides).find(([, value]) => value.role === 'start')?.[0] ?? '';
@@ -1048,50 +1205,76 @@ function App() {
     return serializer.serializeToString(doc);
   }
 
-  function downloadSvg() {
-    if (!svgRef.current || !detail) return;
-    const svgText = buildExportSvgText();
-    if (!svgText) return;
-    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `route-${detail.route.routeName}-${direction}.svg`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  function runExportWithoutHighlight(exporter: () => void) {
+    if (!highlightKey) {
+      exporter();
+      return;
+    }
+
+    if (highlightTimerRef.current) {
+      window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+
+    setHighlightKey(null);
+    window.requestAnimationFrame(() => {
+      exporter();
+    });
   }
 
-  function downloadPng() {
-    if (!svgRef.current || !detail) return;
-    const svgText = buildExportSvgText();
-    if (!svgText) return;
-    const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-    const image = new Image();
-    image.onload = () => {
-      const box = svgRef.current?.viewBox.baseVal;
-      if (!box) return;
-      const scale = 3;
-      const canvas = document.createElement('canvas');
-      canvas.width = box.width * scale;
-      canvas.height = box.height * scale;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const pngUrl = URL.createObjectURL(blob);
+  function submitExport() {
+    if (!detail) return;
+    const safeName = (exportFileName.trim() || `route-${detail.route.routeName}-${direction}`).replace(/[\\/:*?"<>|]/g, '_');
+
+    if (exportFormat === 'svg') {
+      runExportWithoutHighlight(() => {
+        const svgText = buildExportSvgText();
+        if (!svgText) return;
+        const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
-        anchor.href = pngUrl;
-        anchor.download = `route-${detail.route.routeName}-${direction}.png`;
+        anchor.href = url;
+        anchor.download = `${safeName}.svg`;
         anchor.click();
-        URL.revokeObjectURL(pngUrl);
+        URL.revokeObjectURL(url);
       });
-      URL.revokeObjectURL(url);
-    };
-    image.src = url;
+    } else {
+      runExportWithoutHighlight(() => {
+        const svgText = buildExportSvgText();
+        if (!svgText || !svgRef.current) return;
+        const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const image = new Image();
+        image.onload = () => {
+          const box = svgRef.current?.viewBox.baseVal;
+          if (!box) return;
+          const canvas = document.createElement('canvas');
+          canvas.width = box.width * exportScale;
+          canvas.height = box.height * exportScale;
+          const context = canvas.getContext('2d');
+          if (!context) return;
+          if (exportWhiteBg) {
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            if (!blob) return;
+            const pngUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = pngUrl;
+            anchor.download = `${safeName}.png`;
+            anchor.click();
+            URL.revokeObjectURL(pngUrl);
+          });
+          URL.revokeObjectURL(url);
+        };
+        image.src = url;
+      });
+    }
+
+    touchStage('export');
+    setIsExportModalOpen(false);
   }
 
   const connectorTargetId =
@@ -1099,23 +1282,154 @@ function App() {
       ? String(stationOverrides[effectiveEndId].connectedToStationId)
       : '';
 
+  const filteredStationCatalog = useMemo(() => {
+    const keyword = stationSearch.trim().toLowerCase();
+    return stationCatalog.filter((station) => {
+      if (filterInMapOnly && !displayedStationIds.has(station.stationId)) return false;
+      if (filterCustomOnly && !station.isCustom) return false;
+      if (!keyword) return true;
+      return station.stationName.toLowerCase().includes(keyword);
+    });
+  }, [stationCatalog, stationSearch, filterInMapOnly, filterCustomOnly, displayedStationIds]);
+
+  const layoutWarnings = useMemo<LayoutWarning[]>(() => {
+    const warnings: LayoutWarning[] = [];
+    const lineSpan = layoutOverride.lineEndX - layoutOverride.lineStartX;
+    if (lineSpan < 260) {
+      warnings.push({
+        id: 'lineSpan',
+        title: '기준선 간격이 좁음',
+        detail: '좌/우 기준선 간격이 작아 정류장 라벨 및 선형 겹침 가능성이 큽니다.',
+      });
+    }
+
+    if (sourceStations.length >= 22 && layoutOverride.rowHeight <= 54 && layoutOverride.labelAngle <= -58) {
+      warnings.push({
+        id: 'labelDensity',
+        title: '라벨 밀집 위험',
+        detail: '정류장 수 대비 행 간격/각도 조합으로 라벨 가독성이 떨어질 수 있습니다.',
+      });
+    }
+
+    if (layoutOverride.cornerStationGap < layoutOverride.turnRadius * 0.7) {
+      warnings.push({
+        id: 'cornerGap',
+        title: '유턴 구간 간섭 위험',
+        detail: '유턴 반경 대비 인접 정류장 간격이 좁아 코너 구간이 답답해질 수 있습니다.',
+      });
+    }
+
+    return warnings;
+  }, [layoutOverride, sourceStations.length]);
+
+  function applyLayoutWarningFix(id: LayoutWarning['id']) {
+    touchStage('layout');
+    setActiveStage('layout');
+    setLayoutOverride((prev) => {
+      if (id === 'lineSpan') {
+        return {
+          ...prev,
+          lineStartX: Math.min(prev.lineStartX, 46),
+          lineEndX: Math.max(prev.lineEndX, 430),
+        };
+      }
+      if (id === 'labelDensity') {
+        return {
+          ...prev,
+          rowHeight: Math.max(prev.rowHeight, 58),
+          labelAngle: Math.min(prev.labelAngle, -52),
+        };
+      }
+      return {
+        ...prev,
+        cornerStationGap: Math.max(prev.cornerStationGap, Math.round(prev.turnRadius * 0.9)),
+      };
+    });
+  }
+
+  const hasRouteSelection = Boolean(selectedRouteId && detail);
+  const hasStationSelected = Boolean(selectedStationId);
+  const hasAdvancedStationEdits = Object.values(stationOverrides).some(
+    (value) =>
+      Boolean(value.connectedToStationId) ||
+      Boolean(value.segmentLabel?.trim()) ||
+      Number(value.segmentGap ?? 0) > 0 ||
+      value.pointMode === 'subwayTransfer',
+  );
+
+  const stageItems: Array<{ key: StageKey; label: string; status: 'done' | 'todo' }> = [
+    { key: 'route', label: '1) 노선 선택', status: stageTouched.route ? 'done' : 'todo' },
+    { key: 'global', label: '2) 전역 설정', status: stageTouched.global ? 'done' : 'todo' },
+    { key: 'stationBasic', label: '3) 정류장 편집 기본', status: stageTouched.stationBasic ? 'done' : 'todo' },
+    {
+      key: 'stationAdvanced',
+      label: '4) 정류장 편집 고급',
+      status: stageTouched.stationAdvanced && hasAdvancedStationEdits ? 'done' : 'todo',
+    },
+    {
+      key: 'layout',
+      label: '5) 레이아웃 조정',
+      status: stageTouched.layout ? 'done' : 'todo',
+    },
+    { key: 'export', label: '6) 내보내기', status: stageTouched.export ? 'done' : 'todo' },
+  ];
+
+  const canOpen = (stage: StageKey) => {
+    if (stage === 'route') return true;
+    if (stage === 'global') return hasRouteSelection;
+    if (stage === 'stationBasic') return hasRouteSelection;
+    if (stage === 'layout') return hasRouteSelection;
+    if (stage === 'stationAdvanced') return hasStationSelected;
+    return hasRouteSelection;
+  };
+
   return (
     <main className="app-shell">
-      <aside className="control-panel">
-        <div>
-          <h2>노선안내도 Generator</h2>
-        </div>
+      <aside
+        className={`control-panel ${mobileEditTab === 'stations' ? 'mobile-hidden' : ''}`}
+        data-mobile-tab={mobileEditTab}
+      >
+        <section className="stage-nav" aria-label="작업 단계">
+          {stageItems.map((stage) => (
+            <button
+              key={stage.key}
+              type="button"
+              className={`stage-item ${activeStage === stage.key ? 'active' : ''}`}
+              disabled={!canOpen(stage.key)}
+              onClick={() => setActiveStage(stage.key)}
+            >
+              <span>{stage.label}</span>
+              <em className={`stage-badge ${stage.status}`}>{stage.status === 'done' ? '완료' : '대기'}</em>
+            </button>
+          ))}
+        </section>
 
-        <details className="panel-group" open>
+        <details className="panel-group route-group" open={activeStage === 'route' || activeStage === 'global'}>
           <summary>기본 설정</summary>
           <label className="field">
             노선 검색
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="노선번호, 기종점, 지역명" />
+            <input
+              value={query}
+              onChange={(event) => {
+                touchStage('route');
+                setQuery(event.target.value);
+              }}
+              placeholder="노선번호, 기종점, 지역명"
+            />
           </label>
 
           <label className="field">
             노선 선택
-            <select value={selectedRouteId} onChange={(event) => setSelectedRouteId(event.target.value)}>
+            <select
+              value={selectedRouteId}
+              onChange={(event) => {
+                touchStage('route');
+                setSelectedRouteId(event.target.value);
+              }}
+            >
+              <option value="" disabled>
+                노선 선택
+              </option>
               {routes.map((route) => (
                 <option key={route.routeId} value={route.routeId}>
                   {route.routeName} · {route.startStationName} → {route.endStationName}
@@ -1127,11 +1441,31 @@ function App() {
           <label className="field">
             <span className="field-head">
               노선 색상 테마
-              <button type="button" className="mini-reset" onClick={() => setThemeName('teal')}>
+              <button
+                type="button"
+                className="mini-reset"
+                onClick={() => {
+                  commitHistory();
+                  touchStage('global');
+                  setThemeName('');
+                  pulseHighlight('line');
+                }}
+              >
                 reset
               </button>
             </span>
-            <select value={themeName} onChange={(event) => setThemeName(event.target.value as ThemeName)}>
+            <select
+              value={themeName}
+              onChange={(event) => {
+                commitHistory();
+                touchStage('global');
+                setThemeName(event.target.value as ThemeName);
+                pulseHighlight('line');
+              }}
+            >
+              <option value="" disabled>
+                테마 선택
+              </option>
               {Object.entries(themes).map(([key, value]) => (
                 <option key={key} value={key}>
                   {value.label}
@@ -1142,12 +1476,32 @@ function App() {
 
           <label className="field">
             출발-도착지 텍스트
-            <input value={customTerminalText} onChange={(event) => setCustomTerminalText(event.target.value)} placeholder="비워두면 자동(기본값)" />
+            <input
+              value={customTerminalText}
+              onChange={(event) => {
+                commitHistory();
+                touchStage('global');
+                setCustomTerminalText(event.target.value);
+                pulseHighlight('terminal');
+              }}
+              placeholder="비워두면 자동(기본값)"
+            />
           </label>
 
           <label className="field">
             헤더 로고
-            <select value={headerLogo} onChange={(event) => setHeaderLogo(event.target.value as HeaderLogoKey)}>
+            <select
+              value={headerLogo}
+              onChange={(event) => {
+                commitHistory();
+                touchStage('global');
+                setHeaderLogo(event.target.value as HeaderLogoKey);
+                pulseHighlight('header');
+              }}
+            >
+              <option value="" disabled>
+                로고 선택
+              </option>
               {Object.entries(headerLogoOptions).map(([key, value]) => (
                 <option key={key} value={key}>
                   {value.label}
@@ -1157,12 +1511,28 @@ function App() {
           </label>
         </details>
 
-        <details className="panel-group" open>
+        <details className="panel-group layout-group" open={activeStage === 'layout'}>
           <summary>레이아웃 조정</summary>
+          {layoutWarnings.length > 0 && (
+            <div className="layout-warning-box">
+              <p className="layout-warning-title">충돌/가독성 경고 {layoutWarnings.length}건</p>
+              {layoutWarnings.map((warning) => (
+                <div key={warning.id} className="layout-warning-item">
+                  <div>
+                    <strong>{warning.title}</strong>
+                    <p>{warning.detail}</p>
+                  </div>
+                  <button type="button" className="mini-reset" onClick={() => applyLayoutWarningFix(warning.id)}>
+                    자동 보정
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <label className="field">
             <span className="field-head">
               정류장명 각도: {layoutOverride.labelAngle}도
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('labelAngle')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('labelAngle'); pulseHighlight('labels'); }}>
                 reset
               </button>
             </span>
@@ -1171,88 +1541,88 @@ function App() {
               min="-70"
               max="-30"
               value={layoutOverride.labelAngle}
-              onChange={(event) => setLayoutOverride((prev) => ({ ...prev, labelAngle: Number(event.target.value) }))}
+              onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, labelAngle: Number(event.target.value) })); pulseHighlight('labels'); }}
             />
           </label>
 
           <label className="field">
             <span className="field-head">
               행 간격: {layoutOverride.rowHeight}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('rowHeight')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('rowHeight'); pulseHighlight('line'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="48" max="80" value={layoutOverride.rowHeight} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, rowHeight: Number(event.target.value) }))} />
+            <input type="range" min="48" max="80" value={layoutOverride.rowHeight} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, rowHeight: Number(event.target.value) })); pulseHighlight('line'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               노선선 두께: {layoutOverride.lineStrokeWidth.toFixed(1)}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('lineStrokeWidth')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('lineStrokeWidth'); pulseHighlight('line'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="2" max="6" step="0.2" value={layoutOverride.lineStrokeWidth} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: Number(event.target.value) }))} />
+            <input type="range" min="2" max="6" step="0.2" value={layoutOverride.lineStrokeWidth} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: Number(event.target.value) })); pulseHighlight('line'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               노선명 크기: {layoutOverride.routeNameFontSize}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('routeNameFontSize')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('routeNameFontSize'); pulseHighlight('routeName'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="24" max="44" value={layoutOverride.routeNameFontSize} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, routeNameFontSize: Number(event.target.value) }))} />
+            <input type="range" min="24" max="44" value={layoutOverride.routeNameFontSize} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, routeNameFontSize: Number(event.target.value) })); pulseHighlight('routeName'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               출발/도착 점 크기: {layoutOverride.terminalMarkerRadius.toFixed(1)}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('terminalMarkerRadius')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('terminalMarkerRadius'); pulseHighlight('station'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="2.5" max="5" step="0.1" value={layoutOverride.terminalMarkerRadius} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: Number(event.target.value) }))} />
+            <input type="range" min="2.5" max="5" step="0.1" value={layoutOverride.terminalMarkerRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: Number(event.target.value) })); pulseHighlight('station'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               좌측 기준선: {layoutOverride.lineStartX}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('lineStartX')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('lineStartX'); pulseHighlight('line'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="8" max="120" value={layoutOverride.lineStartX} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, lineStartX: Number(event.target.value) }))} />
+            <input type="range" min="8" max="120" value={layoutOverride.lineStartX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStartX: Number(event.target.value) })); pulseHighlight('line'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               우측 기준선: {layoutOverride.lineEndX}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('lineEndX')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('lineEndX'); pulseHighlight('line'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="380" max="492" value={layoutOverride.lineEndX} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, lineEndX: Number(event.target.value) }))} />
+            <input type="range" min="380" max="492" value={layoutOverride.lineEndX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineEndX: Number(event.target.value) })); pulseHighlight('line'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               유턴 반경: {layoutOverride.turnRadius}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('turnRadius')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('turnRadius'); pulseHighlight('line'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="8" max="30" value={layoutOverride.turnRadius} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, turnRadius: Number(event.target.value) }))} />
+            <input type="range" min="8" max="30" value={layoutOverride.turnRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, turnRadius: Number(event.target.value) })); pulseHighlight('line'); }} />
           </label>
 
           <label className="field">
             <span className="field-head">
               유턴-인접정류장 간격: {layoutOverride.cornerStationGap}
-              <button type="button" className="mini-reset" onClick={() => resetLayoutField('cornerStationGap')}>
+              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('cornerStationGap'); pulseHighlight('line'); }}>
                 reset
               </button>
             </span>
-            <input type="range" min="8" max="32" value={layoutOverride.cornerStationGap} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, cornerStationGap: Number(event.target.value) }))} />
+            <input type="range" min="8" max="32" value={layoutOverride.cornerStationGap} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, cornerStationGap: Number(event.target.value) })); pulseHighlight('line'); }} />
           </label>
         </details>
 
@@ -1262,8 +1632,57 @@ function App() {
       <section className="preview-panel">
         <div className="preview-header">
           <div>
+            <h1>노선안내도 Generator</h1>
             <p className="eyebrow">Preview</p>
-            <h2>{detail ? `${detail.route.routeName}` : '노선 선택 대기'}</h2>
+          </div>
+          <div className="preview-history-actions" aria-label="히스토리 액션">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={undoHistory}
+              disabled={historyPast.length === 0}
+              title="실행취소 (Ctrl/Cmd+Z)"
+              aria-label="실행취소 (Ctrl/Cmd+Z)"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M9 6L3 12L9 18" fill="currentColor" stroke="none" transform="translate(0 -5.5)" />
+                <path d="M6.5 18H14.8C18.2 18 21 15.2 21 11.8C21 8.4 18.2 5.6 14.8 5.6H8.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={redoHistory}
+              disabled={historyFuture.length === 0}
+              title="다시실행 (Ctrl+Y / Shift+Ctrl/Cmd+Z)"
+              aria-label="다시실행 (Ctrl+Y / Shift+Ctrl/Cmd+Z)"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M15 6L21 12L15 18" fill="currentColor" stroke="none" transform="translate(0 -5.5)" />
+                <path d="M17.5 18H9.2C5.8 18 3 15.2 3 11.8C3 8.4 5.8 5.6 9.2 5.6H15.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => {
+                if (!detail) return;
+                setExportFileName(`route-${detail.route.routeName}`);
+                setExportFormat('png');
+                setExportScale(3);
+                setExportWhiteBg(true);
+                setIsExportModalOpen(true);
+              }}
+              disabled={!detail}
+              title="내보내기"
+              aria-label="내보내기"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M12 4V15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M8 11L12 15L16 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M5 18H19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
         </div>
         <div className="preview-stage">
@@ -1277,69 +1696,174 @@ function App() {
             effectiveEndId={effectiveEndId}
             connectorTargetId={connectorTargetId}
             selectedStationId={selectedStationId}
-            headerLogoKey={headerLogo}
-            headerLogo={headerLogoOptions[headerLogo]}
+            headerLogoKey={selectedHeaderLogo}
+            headerLogo={headerLogoOptions[selectedHeaderLogo]}
             terminalText={terminalText}
+            highlightKey={highlightKey}
             onSelectStation={setSelectedStationId}
             svgRef={svgRef}
           />
         </div>
-        <div className="preview-export-actions">
-          <button type="button" onClick={downloadSvg} disabled={!detail}>SVG export</button>
-          <button type="button" onClick={downloadPng} disabled={!detail}>PNG export</button>
-        </div>
       </section>
 
-      <aside className="edit-panel">
-        <div>
-          <h2>정류장 편집</h2>
-        </div>
-
-        <label className="field">
-          사용자 정의 정류장 추가
-          <input value={newStationName} onChange={(event) => setNewStationName(event.target.value)} placeholder="정류장명 입력" />
-        </label>
-        <button type="button" className="mini-reset" onClick={addCustomStation}>
-          선택 정류장 다음에 추가
+      <nav className="mobile-edit-tabs" aria-label="모바일 편집 탭">
+        <button
+          type="button"
+          className={mobileEditTab === 'settings' ? 'active' : ''}
+          onClick={() => {
+            setMobileEditTab('settings');
+            setActiveStage('global');
+          }}
+        >
+          설정
         </button>
+        <button
+          type="button"
+          className={mobileEditTab === 'layout' ? 'active' : ''}
+          onClick={() => {
+            setMobileEditTab('layout');
+            setActiveStage('layout');
+          }}
+        >
+          레이아웃
+        </button>
+        <button
+          type="button"
+          className={mobileEditTab === 'stations' ? 'active' : ''}
+          onClick={() => {
+            setMobileEditTab('stations');
+            setActiveStage('stationBasic');
+          }}
+        >
+          정류장
+        </button>
+      </nav>
 
-        <div className="station-list">
-          {stationCatalog.map((station) => (
-            (() => {
-              const directionLabel = station.directions.includes(direction)
-                ? direction
-                : station.directions[0] ?? '상행';
-              return (
-            <button
-              key={station.stationId}
-              type="button"
-              className={`station-item ${
-                selectedStationId === station.stationId ? 'active' : ''
-              } ${displayedStationIds.has(station.stationId) ? 'in-map' : 'out-map'} ${
-                station.stationId === effectiveStartId ? 'start-item' : ''
-              } ${station.stationId === effectiveEndId ? 'end-item' : ''}`}
-              onClick={() => setSelectedStationId(station.stationId)}
-            >
-              <span>
-                {station.stationName}
-                {station.isCustom ? ' (사용자정의)' : ''}
-              </span>
-              <small>{directionLabel}</small>
-              {station.stationId === effectiveStartId && <em className="item-comment top">출발 정류장</em>}
-              {station.stationId === effectiveEndId && <em className="item-comment bottom">도착 정류장</em>}
-            </button>
-              );
-            })()
-          ))}
+      {isExportModalOpen && (
+        <div className="export-modal-backdrop" role="dialog" aria-modal="true" aria-label="내보내기 설정">
+          <div className="export-modal">
+            <h3>내보내기 설정</h3>
+            <label className="field">
+              형식
+              <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as ExportFormat)}>
+                <option value="png">PNG</option>
+                <option value="svg">SVG</option>
+              </select>
+            </label>
+            <label className="field">
+              파일명
+              <input value={exportFileName} onChange={(event) => setExportFileName(event.target.value)} placeholder="파일명" />
+            </label>
+            {exportFormat === 'png' && (
+              <>
+                <label className="field">
+                  품질 배율: {exportScale}x
+                  <input type="range" min="1" max="4" step="1" value={exportScale} onChange={(event) => setExportScale(Number(event.target.value))} />
+                </label>
+                <label className="check-field">
+                  <input type="checkbox" checked={exportWhiteBg} onChange={(event) => setExportWhiteBg(event.target.checked)} />
+                  흰 배경 포함
+                </label>
+              </>
+            )}
+            <div className="export-modal-actions">
+              <button type="button" onClick={() => setIsExportModalOpen(false)}>취소</button>
+              <button type="button" onClick={submitExport}>내보내기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <aside className={`edit-panel ${mobileEditTab === 'stations' ? '' : 'mobile-hidden'}`}>
+        <div className="edit-panel-top">
+          <label className="field">
+            사용자 정의 정류장 추가
+            <input value={newStationName} onChange={(event) => { touchStage('stationBasic'); setNewStationName(event.target.value); }} placeholder="정류장명 입력" />
+          </label>
+          <button type="button" className="mini-reset" onClick={() => { touchStage('stationBasic'); addCustomStation(); }}>
+            선택 정류장 다음에 추가
+          </button>
+
+          <details className="station-filter-box">
+            <summary>정류장 검색/필터</summary>
+            <label className="field">
+              정류장 검색
+              <input
+                value={stationSearch}
+                onChange={(event) => {
+                  touchStage('stationBasic');
+                  setStationSearch(event.target.value);
+                }}
+                placeholder="정류장명 검색"
+              />
+            </label>
+
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={filterInMapOnly}
+                onChange={(event) => {
+                  touchStage('stationBasic');
+                  setFilterInMapOnly(event.target.checked);
+                }}
+              />
+              표시 중 정류장만
+            </label>
+
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={filterCustomOnly}
+                onChange={(event) => {
+                  touchStage('stationBasic');
+                  setFilterCustomOnly(event.target.checked);
+                }}
+              />
+              사용자정의 정류장만
+            </label>
+          </details>
+
+          <div className="station-list">
+            {filteredStationCatalog.map((station) => (
+              (() => {
+                const directionLabel = station.directions.includes(direction)
+                  ? direction
+                  : station.directions[0] ?? '상행';
+                return (
+              <button
+                key={station.stationId}
+                type="button"
+                className={`station-item ${
+                  selectedStationId === station.stationId ? 'active' : ''
+                } ${displayedStationIds.has(station.stationId) ? 'in-map' : 'out-map'} ${
+                  station.stationId === effectiveStartId ? 'start-item' : ''
+                } ${station.stationId === effectiveEndId ? 'end-item' : ''}`}
+                onClick={() => { touchStage('stationBasic'); setSelectedStationId(station.stationId); }}
+              >
+                <span>
+                  {station.stationName}
+                  {station.isCustom ? ' (사용자정의)' : ''}
+                </span>
+                <small>{directionLabel}</small>
+                {station.stationId === effectiveStartId && <em className="item-comment top">출발 정류장</em>}
+                {station.stationId === effectiveEndId && <em className="item-comment bottom">도착 정류장</em>}
+              </button>
+                );
+              })()
+            ))}
+            {filteredStationCatalog.length === 0 && <p className="message">필터 조건에 맞는 정류장이 없습니다.</p>}
+          </div>
         </div>
 
-        {selectedStationId && (
-          <div className="station-editor">
+        <div className="edit-panel-bottom">
+          {selectedStationId ? (
+            <div className="station-editor">
+            <h3 className="editor-section-title">기본 편집</h3>
             <label className="field">
               정류장명 수정
               <input
                 value={selectedOverride.customName}
-                onChange={(event) => updateStationOverride(selectedStationId, { customName: event.target.value })}
+                onChange={(event) => { touchStage('stationBasic'); updateStationOverride(selectedStationId, { customName: event.target.value }); pulseHighlight('labels'); }}
                 placeholder="원본명 사용 시 비워두기"
               />
             </label>
@@ -1359,13 +1883,38 @@ function App() {
               </select>
             </label>
 
+            <label className="field">
+              정류장 지점 유형
+              <select
+                value={selectedOverride.pointMode}
+                onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { pointMode: event.target.value as StationPointMode }); }}
+              >
+                <option value="emphasis">강조 정류장 표시</option>
+                <option value="normal">일반 정류장 표시</option>
+                <option value="intercityTransfer">광역버스 환승 가능 정류장</option>
+                <option value="subwayTransfer">지하철 환승가능 정류장</option>
+              </select>
+            </label>
+
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={selectedOverride.omitted}
+                onChange={(event) => { touchStage('stationBasic'); updateStationOverride(selectedStationId, { omitted: event.target.checked }); }}
+              />
+              정류장 생략
+            </label>
+
+            <details className="advanced-editor" open={activeStage === 'stationAdvanced'}>
+              <summary>고급 편집</summary>
+
             {selectedStationId === effectiveEndId && (
               <>
                 <label className="field">
                   연결 정류장
                   <select
                     value={selectedOverride.connectedToStationId ?? ''}
-                    onChange={(event) => updateStationOverride(selectedStationId, { connectedToStationId: event.target.value })}
+                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { connectedToStationId: event.target.value }); }}
                   >
                     <option value="">선택 안함</option>
                     {stationCatalog
@@ -1382,11 +1931,12 @@ function App() {
                   연결선 위치
                   <select
                     value={selectedOverride.connectorAnchor ?? 'center'}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      touchStage('stationAdvanced');
                       updateStationOverride(selectedStationId, {
                         connectorAnchor: event.target.value as 'center' | 'left' | 'right',
-                      })
-                    }
+                      });
+                    }}
                   >
                     <option value="center">정중앙</option>
                     <option value="right">오른쪽</option>
@@ -1400,7 +1950,7 @@ function App() {
               구간 텍스트
               <input
                 value={selectedOverride.segmentLabel ?? ''}
-                onChange={(event) => updateStationOverride(selectedStationId, { segmentLabel: event.target.value })}
+                onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { segmentLabel: event.target.value }); pulseHighlight('segment'); }}
                 placeholder="선택 정류장~다음 정류장 사이 텍스트"
               />
             </label>
@@ -1413,21 +1963,8 @@ function App() {
                 max="80"
                 step="2"
                 value={Number(selectedOverride.segmentGap ?? 0)}
-                onChange={(event) => updateStationOverride(selectedStationId, { segmentGap: Number(event.target.value) })}
+                onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { segmentGap: Number(event.target.value) }); }}
               />
-            </label>
-
-            <label className="field">
-              정류장 지점 유형
-              <select
-                value={selectedOverride.pointMode}
-                onChange={(event) => updateStationOverride(selectedStationId, { pointMode: event.target.value as StationPointMode })}
-              >
-                <option value="emphasis">강조 정류장 표시</option>
-                <option value="normal">일반 정류장 표시</option>
-                <option value="intercityTransfer">광역버스 환승 가능 정류장</option>
-                <option value="subwayTransfer">지하철 환승가능 정류장</option>
-              </select>
             </label>
 
             {selectedOverride.pointMode === 'subwayTransfer' && (
@@ -1437,7 +1974,7 @@ function App() {
                   <input
                     type="color"
                     value={selectedOverride.subwayColor ?? '#a855f7'}
-                    onChange={(event) => updateStationOverride(selectedStationId, { subwayColor: event.target.value })}
+                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { subwayColor: event.target.value }); }}
                   />
                 </label>
                 <label className="field">
@@ -1445,23 +1982,20 @@ function App() {
                   <input
                     value={selectedOverride.subwayLabelText ?? '지'}
                     maxLength={2}
-                    onChange={(event) => updateStationOverride(selectedStationId, { subwayLabelText: event.target.value })}
+                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { subwayLabelText: event.target.value }); }}
                     placeholder="예: 8"
                   />
                 </label>
               </>
             )}
-
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={selectedOverride.omitted}
-                onChange={(event) => updateStationOverride(selectedStationId, { omitted: event.target.checked })}
-              />
-              정류장 생략
-            </label>
+            </details>
           </div>
-        )}
+          ) : (
+            <div className="station-editor station-editor-empty">
+              <p>정류장을 선택하면 상세 편집 항목이 표시됩니다.</p>
+            </div>
+          )}
+        </div>
       </aside>
     </main>
   );
