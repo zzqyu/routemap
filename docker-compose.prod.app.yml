@@ -8,6 +8,8 @@ services:
       - NODE_ENV=production
       - API_PORT=5174
     command: sh -c "npm install --no-audit --no-fund && node server/index.js"
+    volumes:
+      - /root/gg-bus-history:/root/gg-bus-history:ro
 
   web:
     build:
