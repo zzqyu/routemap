@@ -604,6 +604,10 @@ function RouteMapPreview({
           <g key={`${point.stationId}-${point.staOrder}`} onClick={() => onSelectStation(String(point.stationId))} style={{ cursor: 'pointer' }}>
             {pointMode === 'intercityTransfer' ? (
               <g>
+                {(() => {
+                  const baseStroke = '#0369a1';
+                  const baseStrokeWidth = '1.1';
+                  return (
                 <rect
                   x={point.xPos - 4.2}
                   y={point.yPos - 4.2}
@@ -613,13 +617,22 @@ function RouteMapPreview({
                   fill="#0ea5e9"
                   stroke={isSelected ? '#111827' : '#0369a1'}
                   strokeWidth={isSelected ? '1.6' : '1.1'}
+                  data-selected={isSelected ? '1' : '0'}
+                  data-base-stroke={baseStroke}
+                  data-base-stroke-width={baseStrokeWidth}
                 />
+                  );
+                })()}
                 <text x={point.xPos} y={point.yPos + 1.6} textAnchor="middle" fontSize="4" fontWeight="900" fill="#fff">
                   B
                 </text>
               </g>
             ) : pointMode === 'subwayTransfer' ? (
               <g>
+                {(() => {
+                  const baseStroke = '#ffffff';
+                  const baseStrokeWidth = '1.2';
+                  return (
                 <circle
                   cx={point.xPos}
                   cy={point.yPos}
@@ -627,12 +640,21 @@ function RouteMapPreview({
                   fill={subwayColor}
                   stroke={isSelected ? '#111827' : '#ffffff'}
                   strokeWidth={isSelected ? '1.6' : '1.2'}
+                  data-selected={isSelected ? '1' : '0'}
+                  data-base-stroke={baseStroke}
+                  data-base-stroke-width={baseStrokeWidth}
                 />
+                  );
+                })()}
                 <text x={point.xPos} y={point.yPos + 1.5} textAnchor="middle" fontSize="3.8" fontWeight="900" fill="#fff">
                   {subwayLabel}
                 </text>
               </g>
             ) : (
+              (() => {
+                const baseStroke = isEmphasis ? '#fff' : theme.markerStrokeColor;
+                const baseStrokeWidth = '1.2';
+                return (
               <circle
                 cx={point.xPos}
                 cy={point.yPos}
@@ -640,7 +662,12 @@ function RouteMapPreview({
                 fill={isEmphasis ? theme.lineColor : theme.markerFillColor}
                 stroke={isSelected ? '#111827' : isEmphasis ? '#fff' : theme.markerStrokeColor}
                 strokeWidth={isSelected ? '1.8' : '1.2'}
+                data-selected={isSelected ? '1' : '0'}
+                data-base-stroke={baseStroke}
+                data-base-stroke-width={baseStrokeWidth}
               />
+                );
+              })()
             )}
             <text
               x={labelX}
@@ -1003,6 +1030,20 @@ function App() {
     });
 
     if (!changed) return rawSvgText;
+
+    const selectedMarkers = Array.from(doc.querySelectorAll('[data-selected="1"]'));
+    selectedMarkers.forEach((node) => {
+      const baseStroke = node.getAttribute('data-base-stroke');
+      const baseStrokeWidth = node.getAttribute('data-base-stroke-width');
+      if (baseStroke) node.setAttribute('stroke', baseStroke);
+      if (baseStrokeWidth) node.setAttribute('stroke-width', baseStrokeWidth);
+    });
+
+    Array.from(doc.querySelectorAll('[data-selected]')).forEach((node) => {
+      node.removeAttribute('data-selected');
+      node.removeAttribute('data-base-stroke');
+      node.removeAttribute('data-base-stroke-width');
+    });
 
     return serializer.serializeToString(doc);
   }
