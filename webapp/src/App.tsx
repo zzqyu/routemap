@@ -766,6 +766,7 @@ function App() {
   const [stationOverrides, setStationOverrides] = useState<Record<string, StationOverride>>({});
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [stationCatalog, setStationCatalog] = useState<StationListItem[]>([]);
+  const [baseStationCatalog, setBaseStationCatalog] = useState<StationListItem[]>([]);
   const [headerLogoDataUrl, setHeaderLogoDataUrl] = useState('');
   const [mbusMarkDataUrl, setMbusMarkDataUrl] = useState('');
   const [newStationName, setNewStationName] = useState('');
@@ -780,6 +781,8 @@ function App() {
   const [historyPast, setHistoryPast] = useState<HistorySnapshot[]>([]);
   const [historyFuture, setHistoryFuture] = useState<HistorySnapshot[]>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isAddStationModalOpen, setIsAddStationModalOpen] = useState(false);
+  const [isStationEditModalOpen, setIsStationEditModalOpen] = useState(false);
   const [mobileEditTab, setMobileEditTab] = useState<MobileEditTab>('settings');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
   const [exportScale, setExportScale] = useState(3);
@@ -996,10 +999,34 @@ function App() {
       });
 
       const merged = [...byId.values()].sort((a, b) => a.minOrder - b.minOrder || a.stationName.localeCompare(b.stationName));
-      setStationCatalog(merged.map((station, index) => ({ ...station, minOrder: index + 1 })));
+      const normalized = merged.map((station, index) => ({ ...station, minOrder: index + 1 }));
+      setStationCatalog(normalized);
+      setBaseStationCatalog(normalized);
       setSelectedStationId((prev) => (prev && byId.has(prev) ? prev : merged[0]?.stationId ?? ''));
     });
   }, [selectedRouteId]);
+
+  const selectedStationName = selectedStationId
+    ? stationCatalog.find((station) => station.stationId === selectedStationId)?.stationName ?? ''
+    : '';
+
+  const hasStationResetChanges = useMemo(() => {
+    const normalize = (list: StationListItem[]) =>
+      list.map((station) => ({
+        stationId: station.stationId,
+        stationName: station.stationName,
+        directions: [...station.directions].sort(),
+        minOrder: station.minOrder,
+        isCustom: Boolean(station.isCustom),
+      }));
+
+    const catalogChanged = JSON.stringify(normalize(stationCatalog)) !== JSON.stringify(normalize(baseStationCatalog));
+    const overridesChanged = Object.keys(stationOverrides).length > 0;
+    const filterChanged = stationSearch.trim() !== '' || filterInMapOnly || filterCustomOnly;
+    const selectionChanged = selectedStationId !== (baseStationCatalog[0]?.stationId ?? '');
+
+    return catalogChanged || overridesChanged || filterChanged || selectionChanged;
+  }, [stationCatalog, baseStationCatalog, stationOverrides, stationSearch, filterInMapOnly, filterCustomOnly, selectedStationId]);
 
   const theme = themes[themeName || 'teal'];
   const terminalText = customTerminalText.trim() || (detail ? formatTerminal(detail.route, detail.direction) : '출발지 - 목적지');
@@ -1038,8 +1065,6 @@ function App() {
         segmentLabel: '',
         segmentGap: 0,
       };
-
-  const selectedStationMeta = stationCatalog.find((station) => station.stationId === selectedStationId);
 
   const displayedStationIds = useMemo(
     () =>
@@ -1133,11 +1158,9 @@ function App() {
     setNewStationName('');
   }
 
-  function removeCustomStation() {
+  function removeSelectedStation() {
     const targetId = selectedStationId;
     if (!targetId) return;
-    const target = stationCatalog.find((station) => station.stationId === targetId);
-    if (!target?.isCustom) return;
 
     setStationCatalog((prev) => {
       const filtered = prev.filter((station) => station.stationId !== targetId).map((station, index) => ({ ...station, minOrder: index + 1 }));
@@ -1156,6 +1179,15 @@ function App() {
       });
       return cloned;
     });
+  }
+
+  function resetStationCatalog() {
+    setStationCatalog(baseStationCatalog.map((station, index) => ({ ...station, minOrder: index + 1 })));
+    setStationOverrides({});
+    setSelectedStationId(baseStationCatalog[0]?.stationId ?? '');
+    setStationSearch('');
+    setFilterInMapOnly(false);
+    setFilterCustomOnly(false);
   }
 
   function buildExportSvgText() {
@@ -1776,21 +1808,193 @@ function App() {
         </div>
       )}
 
-      <aside className={`edit-panel ${mobileEditTab === 'stations' ? '' : 'mobile-hidden'}`}>
+      {isAddStationModalOpen && (
+        <div className="export-modal-backdrop" role="dialog" aria-modal="true" aria-label="사용자 정의 정류장 추가">
+          <div className="export-modal">
+            <h3>사용자 정의 정류장 추가</h3>
+            <p className="message">선택한 {selectedStationName || '정류장'} 정류장 다음에 추가됩니다.</p>
+            <label className="field">
+              정류장명
+              <input value={newStationName} onChange={(event) => setNewStationName(event.target.value)} placeholder="정류장명 입력" />
+            </label>
+            <div className="export-modal-actions">
+              <button type="button" onClick={() => setIsAddStationModalOpen(false)}>취소</button>
+              <button
+                type="button"
+                onClick={() => {
+                  touchStage('stationBasic');
+                  addCustomStation();
+                  setIsAddStationModalOpen(false);
+                }}
+              >
+                추가
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isStationEditModalOpen && selectedStationId && (
+        <div className="export-modal-backdrop" role="dialog" aria-modal="true" aria-label="정류장 편집">
+          <div className="export-modal station-edit-modal">
+            <h3>정류장 편집</h3>
+            <div className="station-edit-modal-body">
+              <div className="station-editor">
+                <h3 className="editor-section-title">기본 편집</h3>
+                <label className="field">
+                  정류장명 수정
+                  <input
+                    value={selectedOverride.customName}
+                    onChange={(event) => { touchStage('stationBasic'); updateStationOverride(selectedStationId, { customName: event.target.value }); pulseHighlight('labels'); }}
+                    placeholder="원본명 사용 시 비워두기"
+                  />
+                </label>
+
+                <label className="field">
+                  역할
+                  <select value={selectedOverride.role} onChange={(event) => updateStationOverride(selectedStationId, { role: event.target.value as StationRole })}>
+                    <option value="normal">일반</option>
+                    <option value="start">출발</option>
+                    <option value="end">도착</option>
+                  </select>
+                </label>
+
+                <label className="field">
+                  정류장 지점 유형
+                  <select
+                    value={selectedOverride.pointMode}
+                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { pointMode: event.target.value as StationPointMode }); }}
+                  >
+                    <option value="emphasis">강조 정류장 표시</option>
+                    <option value="normal">일반 정류장 표시</option>
+                    <option value="intercityTransfer">광역버스 환승 가능 정류장</option>
+                    <option value="subwayTransfer">지하철 환승가능 정류장</option>
+                  </select>
+                </label>
+
+                <label className="check-field">
+                  <input
+                    type="checkbox"
+                    checked={selectedOverride.omitted}
+                    onChange={(event) => { touchStage('stationBasic'); updateStationOverride(selectedStationId, { omitted: event.target.checked }); }}
+                  />
+                  정류장 생략
+                </label>
+
+                <details className="advanced-editor" open={activeStage === 'stationAdvanced'}>
+                  <summary>고급 편집</summary>
+
+                  {selectedStationId === effectiveEndId && (
+                    <>
+                      <label className="field">
+                        연결 정류장
+                        <select
+                          value={selectedOverride.connectedToStationId ?? ''}
+                          onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { connectedToStationId: event.target.value }); }}
+                        >
+                          <option value="">선택 안함</option>
+                          {stationCatalog
+                            .filter((station) => displayedStationIds.has(station.stationId) && station.stationId !== effectiveEndId)
+                            .map((station) => (
+                              <option key={`connector-${station.stationId}`} value={station.stationId}>
+                                {station.stationName}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+
+                      <label className="field">
+                        연결선 위치
+                        <select
+                          value={selectedOverride.connectorAnchor ?? 'center'}
+                          onChange={(event) => {
+                            touchStage('stationAdvanced');
+                            updateStationOverride(selectedStationId, {
+                              connectorAnchor: event.target.value as 'center' | 'left' | 'right',
+                            });
+                          }}
+                        >
+                          <option value="center">정중앙</option>
+                          <option value="right">오른쪽</option>
+                          <option value="left">왼쪽</option>
+                        </select>
+                      </label>
+                    </>
+                  )}
+
+                  <label className="field">
+                    구간 텍스트
+                    <input
+                      value={selectedOverride.segmentLabel ?? ''}
+                      onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { segmentLabel: event.target.value }); pulseHighlight('segment'); }}
+                      placeholder="선택 정류장~다음 정류장 사이 텍스트"
+                    />
+                  </label>
+
+                  <label className="field">
+                    다음 정류장 간격 확장: {Number(selectedOverride.segmentGap ?? 0)}
+                    <input
+                      type="range"
+                      min="0"
+                      max="80"
+                      step="2"
+                      value={Number(selectedOverride.segmentGap ?? 0)}
+                      onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { segmentGap: Number(event.target.value) }); }}
+                    />
+                  </label>
+
+                  {selectedOverride.pointMode === 'subwayTransfer' && (
+                    <>
+                      <label className="field">
+                        지하철 표식 색상
+                        <input
+                          type="color"
+                          value={selectedOverride.subwayColor ?? '#a855f7'}
+                          onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { subwayColor: event.target.value }); }}
+                        />
+                      </label>
+                      <label className="field">
+                        지하철 라벨 텍스트
+                        <input
+                          value={selectedOverride.subwayLabelText ?? '지'}
+                          maxLength={2}
+                          onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { subwayLabelText: event.target.value }); }}
+                          placeholder="예: 8"
+                        />
+                      </label>
+                    </>
+                  )}
+                </details>
+              </div>
+            </div>
+            <div className="export-modal-actions">
+              <button type="button" onClick={() => setIsStationEditModalOpen(false)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <aside className={`edit-panel stations-desktop ${mobileEditTab === 'stations' ? '' : 'mobile-hidden'}`}>
         <div className="edit-panel-top">
           <h3 className="panel-title">정류장 목록 편집</h3>
-          <label className="field">
-            사용자 정의 정류장 추가
-            <input value={newStationName} onChange={(event) => { touchStage('stationBasic'); setNewStationName(event.target.value); }} placeholder="정류장명 입력" />
-          </label>
-          <button type="button" className="mini-reset" onClick={() => { touchStage('stationBasic'); addCustomStation(); }}>
-            선택 정류장 다음에 추가
-          </button>
+          <div className={`station-action-row ${selectedStationId ? '' : 'disabled'} ${hasStationResetChanges ? '' : 'reset-disabled'}`}>
+            <button type="button" className="mini-reset" onClick={() => setIsAddStationModalOpen(true)} disabled={!selectedStationId}>
+              추가
+            </button>
+            <button type="button" className="mini-reset" onClick={removeSelectedStation} disabled={!selectedStationId}>
+              삭제
+            </button>
+            <button type="button" className="mini-reset" onClick={() => setIsStationEditModalOpen(true)} disabled={!selectedStationId}>
+              편집
+            </button>
+            <button type="button" className="mini-reset" onClick={resetStationCatalog} disabled={!hasStationResetChanges}>
+              초기화
+            </button>
+          </div>
 
-          <details className="station-filter-box">
-            <summary>정류장 검색/필터</summary>
+          <div className="station-filter-box">
+            <h3 className="editor-section-title">정류장 검색/필터</h3>
             <label className="field">
-              정류장 검색
               <input
                 value={stationSearch}
                 onChange={(event) => {
@@ -1824,8 +2028,11 @@ function App() {
               />
               사용자정의 정류장만
             </label>
-          </details>
+          </div>
 
+        </div>
+
+        <div className="edit-panel-bottom">
           <div className="station-list">
             {filteredStationCatalog.map((station) => (
               (() => {
@@ -1841,7 +2048,10 @@ function App() {
                 } ${displayedStationIds.has(station.stationId) ? 'in-map' : 'out-map'} ${
                   station.stationId === effectiveStartId ? 'start-item' : ''
                 } ${station.stationId === effectiveEndId ? 'end-item' : ''}`}
-                onClick={() => { touchStage('stationBasic'); setSelectedStationId(station.stationId); }}
+                onClick={() => {
+                  touchStage('stationBasic');
+                  setSelectedStationId((prev) => (prev === station.stationId ? '' : station.stationId));
+                }}
               >
                 <span>
                   {station.stationName}
@@ -1856,148 +2066,6 @@ function App() {
             ))}
             {filteredStationCatalog.length === 0 && <p className="message">필터 조건에 맞는 정류장이 없습니다.</p>}
           </div>
-        </div>
-
-        <div className="edit-panel-bottom">
-          {selectedStationId ? (
-            <div className="station-editor">
-            <h3 className="editor-section-title">기본 편집</h3>
-            <label className="field">
-              정류장명 수정
-              <input
-                value={selectedOverride.customName}
-                onChange={(event) => { touchStage('stationBasic'); updateStationOverride(selectedStationId, { customName: event.target.value }); pulseHighlight('labels'); }}
-                placeholder="원본명 사용 시 비워두기"
-              />
-            </label>
-
-            {selectedStationMeta?.isCustom && (
-              <button type="button" className="mini-reset" onClick={removeCustomStation}>
-                사용자 정의 정류장 삭제
-              </button>
-            )}
-
-            <label className="field">
-              역할
-              <select value={selectedOverride.role} onChange={(event) => updateStationOverride(selectedStationId, { role: event.target.value as StationRole })}>
-                <option value="normal">일반</option>
-                <option value="start">출발</option>
-                <option value="end">도착</option>
-              </select>
-            </label>
-
-            <label className="field">
-              정류장 지점 유형
-              <select
-                value={selectedOverride.pointMode}
-                onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { pointMode: event.target.value as StationPointMode }); }}
-              >
-                <option value="emphasis">강조 정류장 표시</option>
-                <option value="normal">일반 정류장 표시</option>
-                <option value="intercityTransfer">광역버스 환승 가능 정류장</option>
-                <option value="subwayTransfer">지하철 환승가능 정류장</option>
-              </select>
-            </label>
-
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={selectedOverride.omitted}
-                onChange={(event) => { touchStage('stationBasic'); updateStationOverride(selectedStationId, { omitted: event.target.checked }); }}
-              />
-              정류장 생략
-            </label>
-
-            <details className="advanced-editor" open={activeStage === 'stationAdvanced'}>
-              <summary>고급 편집</summary>
-
-            {selectedStationId === effectiveEndId && (
-              <>
-                <label className="field">
-                  연결 정류장
-                  <select
-                    value={selectedOverride.connectedToStationId ?? ''}
-                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { connectedToStationId: event.target.value }); }}
-                  >
-                    <option value="">선택 안함</option>
-                    {stationCatalog
-                      .filter((station) => displayedStationIds.has(station.stationId) && station.stationId !== effectiveEndId)
-                      .map((station) => (
-                        <option key={`connector-${station.stationId}`} value={station.stationId}>
-                          {station.stationName}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  연결선 위치
-                  <select
-                    value={selectedOverride.connectorAnchor ?? 'center'}
-                    onChange={(event) => {
-                      touchStage('stationAdvanced');
-                      updateStationOverride(selectedStationId, {
-                        connectorAnchor: event.target.value as 'center' | 'left' | 'right',
-                      });
-                    }}
-                  >
-                    <option value="center">정중앙</option>
-                    <option value="right">오른쪽</option>
-                    <option value="left">왼쪽</option>
-                  </select>
-                </label>
-              </>
-            )}
-
-            <label className="field">
-              구간 텍스트
-              <input
-                value={selectedOverride.segmentLabel ?? ''}
-                onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { segmentLabel: event.target.value }); pulseHighlight('segment'); }}
-                placeholder="선택 정류장~다음 정류장 사이 텍스트"
-              />
-            </label>
-
-            <label className="field">
-              다음 정류장 간격 확장: {Number(selectedOverride.segmentGap ?? 0)}
-              <input
-                type="range"
-                min="0"
-                max="80"
-                step="2"
-                value={Number(selectedOverride.segmentGap ?? 0)}
-                onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { segmentGap: Number(event.target.value) }); }}
-              />
-            </label>
-
-            {selectedOverride.pointMode === 'subwayTransfer' && (
-              <>
-                <label className="field">
-                  지하철 표식 색상
-                  <input
-                    type="color"
-                    value={selectedOverride.subwayColor ?? '#a855f7'}
-                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { subwayColor: event.target.value }); }}
-                  />
-                </label>
-                <label className="field">
-                  지하철 라벨 텍스트
-                  <input
-                    value={selectedOverride.subwayLabelText ?? '지'}
-                    maxLength={2}
-                    onChange={(event) => { touchStage('stationAdvanced'); updateStationOverride(selectedStationId, { subwayLabelText: event.target.value }); }}
-                    placeholder="예: 8"
-                  />
-                </label>
-              </>
-            )}
-            </details>
-          </div>
-          ) : (
-            <div className="station-editor station-editor-empty">
-              <p>정류장을 선택하면 상세 편집 항목이 표시됩니다.</p>
-            </div>
-          )}
         </div>
       </aside>
     </main>

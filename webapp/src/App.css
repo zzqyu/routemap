@@ -312,6 +312,10 @@ h2 {
   overflow-y: auto;
 }
 
+.edit-panel.stations-desktop {
+  overflow: hidden;
+}
+
 .mobile-edit-tabs {
   display: none;
 }
@@ -340,8 +344,8 @@ h2 {
   flex-direction: column;
   flex: 1 1 44%;
   min-height: 220px;
-  border-top: 1px solid #d8dde6;
-  padding-top: 12px;
+  min-width: 0;
+  flex-grow: 1;
   overflow-y: auto;
 }
 
@@ -351,9 +355,28 @@ h2 {
   gap: 8px;
   padding-top: 14px;
   padding-bottom: 14px;
-  min-height: 260px;
-  max-height: 46vh;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
   overflow: auto;
+}
+
+.station-action-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.station-action-row .mini-reset {
+  min-height: 34px;
+}
+
+.station-action-row.disabled button:nth-child(-n + 3) {
+  opacity: 0.45;
+}
+
+.station-action-row.reset-disabled button:nth-child(4) {
+  opacity: 0.45;
 }
 
 .station-filter-box {
@@ -612,6 +635,16 @@ h2 {
   gap: 10px;
 }
 
+.station-edit-modal {
+  width: min(640px, 100%);
+}
+
+.station-edit-modal-body {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .export-modal h3 {
   margin: 0;
   color: #0f172a;
@@ -698,16 +731,24 @@ h2 {
     box-shadow: none;
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr);
     gap: 12px;
     align-items: stretch;
+    overflow: hidden;
   }
 
   .edit-panel-top,
   .edit-panel-bottom {
-    border-top: 0;
-    padding-top: 0;
     min-height: 0;
-    max-height: 40vh;
+    max-height: none;
+  }
+
+  .edit-panel-top {
+    overflow-y: auto;
+  }
+
+  .edit-panel-bottom {
+    overflow-y: auto;
   }
 }
 
@@ -775,6 +816,10 @@ h2 {
     overflow: visible;
   }
 
+  .edit-panel.stations-desktop {
+    overflow: visible;
+  }
+
   .edit-panel-top,
   .edit-panel-bottom {
     max-height: none;
@@ -787,6 +832,11 @@ h2 {
   .station-list {
     min-height: 45vh;
     max-height: 60vh;
+    height: auto;
+  }
+
+  .station-action-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .control-panel .panel-group {
