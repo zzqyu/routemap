@@ -7,7 +7,7 @@ import { open } from 'sqlite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dbPath = path.resolve(__dirname, '../../basedata.db');
+const dbPath = path.resolve(__dirname, '../basedata.db');
 
 const app = express();
 const port = Number(process.env.PORT ?? 5174);
