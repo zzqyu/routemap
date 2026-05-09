@@ -18,6 +18,7 @@ app.use(express.json());
 const dbPromise = open({
   filename: dbPath,
   driver: sqlite3.Database,
+  mode: sqlite3.OPEN_READONLY,
 });
 
 function normalizeDirection(value) {
