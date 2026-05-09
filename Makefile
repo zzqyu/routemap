@@ -1,8 +1,9 @@
 COMPOSE = docker compose -f docker-compose.yml
 COMPOSE_DEV = docker compose -f docker-compose.dev.yml
 COMPOSE_PROD = docker compose -f docker-compose.prod.yml
+COMPOSE_PROD_APP = docker compose -f docker-compose.prod.app.yml
 
-.PHONY: help dev-up dev-down dev-logs up down logs prod-up prod-down prod-logs web-build web-install web-clean
+.PHONY: help dev-up dev-down dev-logs up down logs prod-up prod-down prod-logs prod-up-app prod-down-app prod-logs-app web-build web-install web-clean
 
 help:
 	@echo "Make targets:"
@@ -15,6 +16,9 @@ help:
 	@echo "  prod-up     - start production stack"
 	@echo "  prod-down   - stop production stack"
 	@echo "  prod-logs   - follow production logs (caddy, web, api)"
+	@echo "  prod-up-app   - start production app stack only (web, api)"
+	@echo "  prod-down-app - stop production app stack only (web, api)"
+	@echo "  prod-logs-app - follow production app logs (web, api)"
 	@echo "  web-build   - build Next.js artifacts in prod web service"
 	@echo "  web-install - install Node dependencies in prod web service"
 	@echo "  web-clean   - clean .next and node_modules in workspace"
@@ -46,6 +50,15 @@ prod-down:
 prod-logs:
 	$(COMPOSE_PROD) logs -f caddy web api
 
+prod-up-app:
+	$(COMPOSE_PROD_APP) up --build -d
+
+prod-down-app:
+	$(COMPOSE_PROD_APP) down
+
+prod-logs-app:
+	$(COMPOSE_PROD_APP) logs -f web api
+
 web-build:
 	$(COMPOSE_PROD) run --rm --no-deps web sh -c "npm install --no-audit --no-fund && npm run build"
 
@@ -54,4 +67,3 @@ web-install:
 
 web-clean:
 	rm -rf .next node_modules || true
-

@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - API_PORT=5174
+    command: sh -c "npm install --no-audit --no-fund && node server/index.js"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    command: sh -c "npm install --no-audit --no-fund && npm run build && npm run preview"
+    ports:
+      - '127.0.0.1:3001:3000'
+    depends_on:
+      - api
+
