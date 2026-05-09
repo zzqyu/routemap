@@ -2,7 +2,27 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 
 type Direction = '상행' | '하행';
-type ThemeName = 'teal' | 'red' | 'yellow' | 'gyeonggi-blue';
+type ThemeName = 'teal' | 'red' | 'yellow' | 'gyeonggi-blue' | 'black';
+type HeaderLogoKey = 'gbus' | 'mbus' | 'public_bus';
+
+type HeaderLogoOption = {
+  label: string;
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  titleText: string;
+  titleX: number;
+  titleY: number;
+  showHeaderAccent: boolean;
+};
+
+const headerLogoOptions: Record<HeaderLogoKey, HeaderLogoOption> = {
+  gbus: { label: 'G-BUS', src: '/gbus.png', x: -74, y: -8, width: 80, height: 16, titleText: '노선안내도', titleX: -4, titleY: 1, showHeaderAccent: true },
+  mbus: { label: 'M-BUS', src: '/mbus.png', x: -84, y: -14, width: 58, height: 22, titleText: '광역급행 노선안내도', titleX: -24, titleY: 1, showHeaderAccent: false },
+  public_bus: { label: '공공버스', src: '/public_bus.png', x: -59, y: -12, width: 52, height: 20, titleText: '노선안내도', titleX: -4, titleY: 1, showHeaderAccent: true },
+};
 
 type RouteSummary = {
   routeId: string;
@@ -120,6 +140,7 @@ type LayoutOverride = {
   rowHeight: number;
   lineStrokeWidth: number;
   terminalMarkerRadius: number;
+  routeNameFontSize: number;
   lineStartX: number;
   lineEndX: number;
   turnRadius: number;
@@ -144,6 +165,7 @@ const defaultLayoutOverride: LayoutOverride = {
   rowHeight,
   lineStrokeWidth: routeLineStrokeWidth,
   terminalMarkerRadius: 3.6,
+  routeNameFontSize: 34,
   lineStartX,
   lineEndX,
   turnRadius,
@@ -182,6 +204,14 @@ const themes: Record<ThemeName, Theme> = {
     markerFillColor: '#ffffff',
     markerStrokeColor: '#0085CA',
     headerAccentColor: '#0085CA',
+  },
+  black: {
+    label: '검은색 · #000',
+    lineColor: '#000000',
+    routeNumberColor: '#000000',
+    markerFillColor: '#ffffff',
+    markerStrokeColor: '#000000',
+    headerAccentColor: '#000000',
   },
 };
 
@@ -365,7 +395,7 @@ function getLabelMetrics(lineCount: number, fontSize: number) {
 }
 
 function splitStationName(name: string) {
-  if (name.length <= 8) return { lines: [name], fontSize: 5.5 };
+  if (name.length <= 11) return { lines: [name], fontSize: 5.5 };
   const cleanName = name.replace(/\s+/g, ' ').trim();
   const breakMatch = [...cleanName.matchAll(/[.·\s]/g)]
     .map((match) => match.index ?? 0)
@@ -395,6 +425,9 @@ function RouteMapPreview({
   effectiveEndId,
   connectorTargetId,
   selectedStationId,
+  headerLogoKey,
+  headerLogo,
+  terminalText,
   onSelectStation,
   svgRef,
 }: {
@@ -407,6 +440,9 @@ function RouteMapPreview({
   effectiveEndId: string;
   connectorTargetId: string;
   selectedStationId: string;
+  headerLogoKey: HeaderLogoKey;
+  headerLogo: HeaderLogoOption;
+  terminalText: string;
   onSelectStation: (stationId: string) => void;
   svgRef: React.RefObject<SVGSVGElement | null>;
 }) {
@@ -451,7 +487,17 @@ function RouteMapPreview({
     return `M ${endPoint.xPos} ${endPoint.yPos} L ${endPoint.xPos} ${midY} L ${targetJoinX} ${midY} L ${targetJoinX} ${targetJoinY}`;
   }, [layout.points, effectiveEndId, connectorTargetId, layoutOverride.turnRadius, layoutOverride.terminalMarkerRadius, stationOverrides]);
   const routeName = detail?.route.routeName ?? '노선';
-  const terminal = detail ? formatTerminal(detail.route, detail.direction) : '출발지 - 목적지';
+  const displayRouteName = headerLogoKey === 'mbus' && /^m/i.test(routeName) ? routeName.replace(/^m\s*/i, '') : routeName;
+  const showMbusPrefix = headerLogoKey === 'mbus';
+  const routeNameFontSize = layoutOverride.routeNameFontSize;
+  const routeNameY = topPadding + 42;
+  const routeNameRightX = canvasWidth - rightPad;
+  const routeNameApproxWidth = Math.max(1, displayRouteName.length) * routeNameFontSize * 0.55;
+  const routeNameLeftX = routeNameRightX - routeNameApproxWidth;
+  const mbusPrefixSize = Math.max(20, Math.round(routeNameFontSize * 1.16));
+  const mbusPrefixGap = Math.max(4, Math.round(routeNameFontSize * 0.12));
+  const mbusPrefixBottomOffset = Math.max(0.5, routeNameFontSize * 0.18);
+  const mbusPrefixX = routeNameLeftX - mbusPrefixGap - mbusPrefixSize;
 
   return (
     <svg
@@ -479,15 +525,15 @@ function RouteMapPreview({
         </marker>
       </defs>
       <rect x="0" y="0" width={canvasWidth} height={layout.height} fill="#fff" />
-      <path d={`M 180 ${topPadding} H 320 Q 250 ${topPadding + 27} 180 ${topPadding}`} fill={theme.headerAccentColor} opacity="0.95" />
+      {headerLogo.showHeaderAccent && <path d={`M 180 ${topPadding} H 320 Q 250 ${topPadding + 27} 180 ${topPadding}`} fill={theme.headerAccentColor} opacity="0.95" />}
       <text x="14" y={topPadding + 21} fontSize="10" fontWeight="800" fill={theme.routeNumberColor}>
-        {terminal}
+        {terminalText}
       </text>
-      <text x="14" y={topPadding + 35} fontSize="4.8" fontWeight="700" fill="#111">
+      <text x="14" y={topPadding + 28} fontSize="4.8" fontWeight="700" fill="#111">
         {detail ? `운송회사: ${detail.route.companyName ?? '-'} / 문의: ${detail.route.companyTel ?? '-'}` : '노선을 선택하세요'}
       </text>
       {detail?.scheduleRows.map((row, index) => (
-        <text key={row.label} x="14" y={topPadding + 41 + index * 6} fontSize="4.8" fontWeight="700" fill="#111">
+        <text key={row.label} x="14" y={topPadding + 34 + index * 6} fontSize="4.8" fontWeight="700" fill="#111">
           {(() => {
             const [startFirst = '-', endFirst = '-'] = String(row.firstTime ?? '-|-').split('|');
             const [startLast = '-', endLast = '-'] = String(row.lastTime ?? '-|-').split('|');
@@ -498,19 +544,29 @@ function RouteMapPreview({
 
       <g transform={`translate(250 ${topPadding + 36})`}>
         <image
-          href="/G_BUS_Logo.svg.png"
-          x={-74}
-          y={-8}
-          width={80}
-          height={16}
+          href={headerLogo.src}
+          x={headerLogo.x}
+          y={headerLogo.y}
+          width={headerLogo.width}
+          height={headerLogo.height}
           preserveAspectRatio="xMidYMid meet"
         />
-        <text x={-4} y={1} textAnchor="start" fontSize="13.5" fontWeight="900" fill="#111" dominantBaseline="middle">
-          노선안내도
+        <text x={headerLogo.titleX} y={headerLogo.titleY} textAnchor="start" fontSize="13.5" fontWeight="900" fill="#111" dominantBaseline="middle">
+          {headerLogo.titleText}
         </text>
       </g>
-      <text x={canvasWidth - rightPad} y={topPadding + 42} textAnchor="end" fontSize="34" fontWeight="900" fill={theme.routeNumberColor}>
-        {routeName}
+      {showMbusPrefix && (
+        <image
+          href="/mbus_m.png"
+          x={mbusPrefixX}
+          y={routeNameY - mbusPrefixSize + mbusPrefixBottomOffset}
+          width={mbusPrefixSize}
+          height={mbusPrefixSize}
+          preserveAspectRatio="xMidYMid meet"
+        />
+      )}
+      <text x={routeNameRightX} y={routeNameY} textAnchor="end" fontSize={routeNameFontSize} fontWeight="900" fill={theme.routeNumberColor}>
+        {displayRouteName}
       </text>
 
       {routePath && (
@@ -633,13 +689,16 @@ function App() {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const direction: Direction = '상행';
   const [themeName, setThemeName] = useState<ThemeName>('teal');
+  const [headerLogo, setHeaderLogo] = useState<HeaderLogoKey>('gbus');
   const [layoutOverride, setLayoutOverride] = useState<LayoutOverride>(defaultLayoutOverride);
   const [stationOverrides, setStationOverrides] = useState<Record<string, StationOverride>>({});
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [stationCatalog, setStationCatalog] = useState<StationListItem[]>([]);
-  const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [headerLogoDataUrl, setHeaderLogoDataUrl] = useState('');
+  const [mbusMarkDataUrl, setMbusMarkDataUrl] = useState('');
   const [newStationName, setNewStationName] = useState('');
   const [detail, setDetail] = useState<RouteDetailResponse | null>(null);
+  const [customTerminalText, setCustomTerminalText] = useState('');
   const [message, setMessage] = useState('');
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -674,7 +733,7 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch('/G_BUS_Logo.svg.png')
+    fetch(headerLogoOptions[headerLogo].src)
       .then((response) => (response.ok ? response.blob() : null))
       .then((blob) => {
         if (!blob) return;
@@ -682,13 +741,38 @@ function App() {
         reader.onloadend = () => {
           if (cancelled) return;
           if (typeof reader.result === 'string') {
-            setLogoDataUrl(reader.result);
+            setHeaderLogoDataUrl(reader.result);
           }
         };
         reader.readAsDataURL(blob);
       })
       .catch(() => {
-        if (!cancelled) setLogoDataUrl('');
+        if (!cancelled) setHeaderLogoDataUrl('');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [headerLogo]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/mbus_m.png')
+      .then((response) => (response.ok ? response.blob() : null))
+      .then((blob) => {
+        if (!blob) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (cancelled) return;
+          if (typeof reader.result === 'string') {
+            setMbusMarkDataUrl(reader.result);
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {
+        if (!cancelled) setMbusMarkDataUrl('');
       });
 
     return () => {
@@ -734,6 +818,7 @@ function App() {
   }, [selectedRouteId]);
 
   const theme = themes[themeName];
+  const terminalText = customTerminalText.trim() || (detail ? formatTerminal(detail.route, detail.direction) : '출발지 - 목적지');
   const baseEndpoints = detail?.route ? getEndpointIds(detail.route, direction) : { startId: '', endId: '' };
   const overrideStartId = Object.entries(stationOverrides).find(([, value]) => value.role === 'start')?.[0] ?? '';
   const overrideEndId = Object.entries(stationOverrides).find(([, value]) => value.role === 'end')?.[0] ?? '';
@@ -896,19 +981,28 @@ function App() {
     const rawSvgText = serializer.serializeToString(svgRef.current);
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawSvgText, 'image/svg+xml');
-    const logoCandidates = Array.from(doc.querySelectorAll('image')).filter((node) => {
+    const imageNodes = Array.from(doc.querySelectorAll('image'));
+    let changed = false;
+
+    imageNodes.forEach((node) => {
       const href = node.getAttribute('href') ?? node.getAttribute('xlink:href') ?? '';
-      return href.includes('G_BUS_Logo.svg.png');
+      if (href.includes('mbus_m.png')) {
+        if (!mbusMarkDataUrl) return;
+        node.setAttribute('href', mbusMarkDataUrl);
+        node.removeAttribute('xlink:href');
+        changed = true;
+        return;
+      }
+
+      if (href.includes('gbus.png') || href.includes('mbus.png') || href.includes('public_bus.png')) {
+        if (!headerLogoDataUrl) return;
+        node.setAttribute('href', headerLogoDataUrl);
+        node.removeAttribute('xlink:href');
+        changed = true;
+      }
     });
 
-    if (logoCandidates.length === 0 || !logoDataUrl) {
-      return rawSvgText;
-    }
-
-    logoCandidates.forEach((node) => {
-      node.setAttribute('href', logoDataUrl);
-      node.removeAttribute('xlink:href');
-    });
+    if (!changed) return rawSvgText;
 
     return serializer.serializeToString(doc);
   }
@@ -1004,6 +1098,22 @@ function App() {
               ))}
             </select>
           </label>
+
+          <label className="field">
+            출발-도착지 텍스트
+            <input value={customTerminalText} onChange={(event) => setCustomTerminalText(event.target.value)} placeholder="비워두면 자동(기본값)" />
+          </label>
+
+          <label className="field">
+            헤더 로고
+            <select value={headerLogo} onChange={(event) => setHeaderLogo(event.target.value as HeaderLogoKey)}>
+              {Object.entries(headerLogoOptions).map(([key, value]) => (
+                <option key={key} value={key}>
+                  {value.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </details>
 
         <details className="panel-group" open>
@@ -1042,6 +1152,16 @@ function App() {
               </button>
             </span>
             <input type="range" min="2" max="6" step="0.2" value={layoutOverride.lineStrokeWidth} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: Number(event.target.value) }))} />
+          </label>
+
+          <label className="field">
+            <span className="field-head">
+              노선명 크기: {layoutOverride.routeNameFontSize}
+              <button type="button" className="mini-reset" onClick={() => resetLayoutField('routeNameFontSize')}>
+                reset
+              </button>
+            </span>
+            <input type="range" min="24" max="44" value={layoutOverride.routeNameFontSize} onChange={(event) => setLayoutOverride((prev) => ({ ...prev, routeNameFontSize: Number(event.target.value) }))} />
           </label>
 
           <label className="field">
@@ -1102,9 +1222,8 @@ function App() {
         <div className="preview-header">
           <div>
             <p className="eyebrow">Preview</p>
-            <h2>{detail ? `${detail.route.routeName} ${direction}` : '노선 선택 대기'}</h2>
+            <h2>{detail ? `${detail.route.routeName}` : '노선 선택 대기'}</h2>
           </div>
-          <p>{detail?.stations.length ?? 0}개 정류장</p>
         </div>
         <div className="preview-stage">
           <RouteMapPreview
@@ -1117,6 +1236,9 @@ function App() {
             effectiveEndId={effectiveEndId}
             connectorTargetId={connectorTargetId}
             selectedStationId={selectedStationId}
+            headerLogoKey={headerLogo}
+            headerLogo={headerLogoOptions[headerLogo]}
+            terminalText={terminalText}
             onSelectStation={setSelectedStationId}
             svgRef={svgRef}
           />
