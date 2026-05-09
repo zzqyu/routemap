@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sqlite3 from 'sqlite3';
@@ -7,7 +8,10 @@ import { open } from 'sqlite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dbPath = path.resolve(__dirname, '../basedata.db');
+const defaultDbPath = path.resolve(__dirname, '../basedata.db');
+const mountedDbPath = '/root/gg-bus-history/basedata.db';
+const dbPath =
+  process.env.DB_PATH ?? (fs.existsSync(mountedDbPath) ? mountedDbPath : defaultDbPath);
 
 const app = express();
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 5174);
