@@ -120,6 +120,10 @@ h2 {
   text-align: left;
 }
 
+.field:has(input[type='range']) {
+  gap: 4px;
+}
+
 .field-head {
   display: flex;
   align-items: center;
@@ -221,6 +225,8 @@ h2 {
 .field select {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 40px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
@@ -362,13 +368,26 @@ h2 {
 }
 
 .station-action-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: inline-grid;
+  grid-template-columns: repeat(4, 34px);
   gap: 8px;
+  margin-left: auto;
 }
 
 .station-action-row .mini-reset {
   min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+
+.station-action-row .station-action-icon {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  border-radius: 8px;
+  justify-self: end;
 }
 
 .station-action-row.disabled button:nth-child(-n + 3) {
@@ -836,7 +855,21 @@ h2 {
   }
 
   .station-action-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .station-action-row .mini-reset {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .station-action-row .station-action-icon {
+    width: 34px;
+    flex: 0 0 34px;
   }
 
   .control-panel .panel-group {
