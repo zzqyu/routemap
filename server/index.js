@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../basedata.db');
 
 const app = express();
-const port = Number(process.env.PORT ?? 5174);
+const port = Number(process.env.API_PORT ?? process.env.PORT ?? 5174);
 
 app.use(cors());
 app.use(express.json());

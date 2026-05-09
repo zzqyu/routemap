@@ -1,6 +1,6 @@
 import type { HeaderLogoKey, HeaderLogoOption, LayoutOverride, Theme, ThemeName } from './types';
 
-export const apiBase = 'http://localhost:5174/api';
+export const apiBase = '/api';
 export const canvasWidth = 500;
 export const minCanvasHeight = 180;
 export const topPadding = 0;
@@ -74,4 +74,3 @@ export const headerLogoOptions: Record<HeaderLogoKey, HeaderLogoOption> = {
   mbus: { label: 'M-BUS', src: '/mbus.png', x: -84, y: -14, width: 58, height: 22, titleText: '광역급행 노선안내도', titleX: -24, titleY: 1, showHeaderAccent: false },
   public_bus: { label: '공공버스', src: '/public_bus.png', x: -59, y: -12, width: 52, height: 20, titleText: '노선안내도', titleX: -4, titleY: 1, showHeaderAccent: true },
 };
-

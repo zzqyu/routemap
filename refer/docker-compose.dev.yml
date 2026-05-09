@@ -1,0 +1,45 @@
+version: '3.8'
+services:
+  api:
+    build:
+      context: ./api
+    volumes:
+      - ./api:/app
+      - ./basedata:/data
+      - ./basedata.db:/app/basedata.db
+    env_file:
+      - .env.local
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - '8000:8000'
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    volumes:
+      - ./:/usr/src/app
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=development
+    command: sh -c "npm ci --no-audit --no-fund || true; npm run dev"
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:

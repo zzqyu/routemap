@@ -4,13 +4,51 @@
 
 ## 실행
 
+### Docker Compose (refer 동일 구성)
+
+기본 스택(`docker-compose.yml`):
+
 ```bash
-cd webapp
+make up
+make logs
+```
+
+개발 스택(`docker-compose.dev.yml`):
+
+```bash
+make dev-up
+make dev-logs
+```
+
+운영 스택(`docker-compose.prod.yml`):
+
+```bash
+make prod-up
+make prod-logs
+```
+
+중지:
+
+```bash
+make down
+make dev-down
+make prod-down
+```
+
+- 외부 진입점: `http://localhost:3000` (Caddy)
+- API 서버(Express): 컨테이너 내부 전용(외부 미노출)
+- API 요청은 [`/api`](src/features/route-map/constants.ts:3) 경로로 호출되고, Next 리라이트([`rewrites()`](next.config.ts:6))로 `api` 서비스에 전달됩니다.
+
+### 로컬(Node.js)
+
+```bash
 npm run dev
 ```
 
 - API 서버: `http://localhost:5174`
-- Vite 앱: `http://localhost:5173`
+- 웹 앱(Next.js): `http://localhost:3000`
+
+로컬 실행 시에도 프론트엔드 API 베이스는 상대경로(`/api`)를 사용합니다.
 
 ## 구현된 init 기능
 

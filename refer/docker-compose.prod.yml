@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  api:
+    build:
+      context: ./api
+    volumes:
+      # mount application code so image remains small; allow DB write
+      - ./api:/app
+      - ./basedata:/data
+      - ./basedata.db:/app/basedata.db
+    env_file:
+      - .env.local
+    environment:
+      - PYTHONUNBUFFERED=1
+    # API is internal only in production (no published ports)
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    volumes:
+      - ./:/usr/src/app
+    env_file:
+      - .env.local
+    environment: {}
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:
