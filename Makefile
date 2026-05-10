@@ -3,7 +3,17 @@ COMPOSE_DEV = docker compose -f docker-compose.dev.yml
 COMPOSE_PROD = docker compose -f docker-compose.prod.yml
 COMPOSE_PROD_APP = docker compose -f docker-compose.prod.app.yml
 
-.PHONY: help dev-up dev-down dev-logs up down logs prod-up prod-down prod-logs prod-up-app prod-down-app prod-logs-app web-build web-install web-clean
+-include deploy.config.mk
+
+SSH_USER ?= root
+SSH_HOST ?= bustal-time.kro.kr
+SSH_PORT ?= 2222
+REMOTE_DIR ?= /root/routemap
+REMOTE_COMPOSE_FILE ?= docker-compose.prod.app.yml
+REMOTE_BRANCH ?= master
+SSH = ssh -p $(SSH_PORT) $(SSH_USER)@$(SSH_HOST)
+
+.PHONY: help dev-up dev-down dev-logs up down logs prod-up prod-down prod-logs prod-up-app prod-down-app prod-logs-app web-build web-install web-clean remote-status remote-pull remote-up-app remote-down-app remote-logs-app remote-ps deploy-app
 
 help:
 	@echo "Make targets:"
@@ -22,6 +32,13 @@ help:
 	@echo "  web-build   - build Next.js artifacts in prod web service"
 	@echo "  web-install - install Node dependencies in prod web service"
 	@echo "  web-clean   - clean .next and node_modules in workspace"
+	@echo "  remote-status - show remote branch/HEAD and compose container status"
+	@echo "  remote-pull   - pull latest code on remote server"
+	@echo "  remote-up-app - build and start remote app stack"
+	@echo "  remote-down-app - stop remote app stack"
+	@echo "  remote-logs-app - follow remote app logs"
+	@echo "  remote-ps     - show remote app container status"
+	@echo "  deploy-app    - remote pull + rebuild + restart + status"
 
 up:
 	$(COMPOSE) up --build -d
@@ -67,3 +84,26 @@ web-install:
 
 web-clean:
 	rm -rf .next node_modules || true
+
+remote-status:
+	$(SSH) "cd $(REMOTE_DIR) && git branch --show-current && git rev-parse --short HEAD && docker-compose -f $(REMOTE_COMPOSE_FILE) ps"
+
+remote-pull:
+	$(SSH) "cd $(REMOTE_DIR) && git fetch origin && git checkout $(REMOTE_BRANCH) && git pull origin $(REMOTE_BRANCH)"
+
+remote-up-app:
+	$(SSH) "cd $(REMOTE_DIR) && docker-compose -f $(REMOTE_COMPOSE_FILE) up -d --build"
+
+remote-down-app:
+	$(SSH) "cd $(REMOTE_DIR) && docker-compose -f $(REMOTE_COMPOSE_FILE) down"
+
+remote-logs-app:
+	$(SSH) "cd $(REMOTE_DIR) && docker-compose -f $(REMOTE_COMPOSE_FILE) logs -f web api"
+
+remote-ps:
+	$(SSH) "cd $(REMOTE_DIR) && docker-compose -f $(REMOTE_COMPOSE_FILE) ps"
+
+deploy-app:
+	$(MAKE) remote-pull
+	$(MAKE) remote-up-app
+	$(MAKE) remote-ps

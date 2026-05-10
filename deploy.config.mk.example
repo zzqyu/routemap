@@ -1,0 +1,13 @@
+# RooCode/다른 세션에서 공통으로 쓰는 배포 설정값 예시
+# 사용 방법:
+# 1) 이 파일을 deploy.config.mk 로 복사
+# 2) 실제 서버 정보로 값 수정
+# 3) make deploy-app 또는 make remote-* 사용
+
+SSH_USER=root
+SSH_HOST=bustal-time.kro.kr
+SSH_PORT=2222
+
+REMOTE_DIR=/root/routemap
+REMOTE_COMPOSE_FILE=docker-compose.prod.app.yml
+REMOTE_BRANCH=master
