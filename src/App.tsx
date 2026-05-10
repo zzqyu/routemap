@@ -529,6 +529,20 @@ function App() {
     });
   }
 
+  function triggerDownload(url: string, filename: string) {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1500);
+  }
+
   function submitExport() {
     if (!detail) return;
     const safeName = (exportFileName.trim() || `route-${detail.route.routeName}-${direction}`).replace(/[\\/:*?"<>|]/g, '_');
@@ -539,11 +553,7 @@ function App() {
         if (!svgText) return;
         const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = `${safeName}.svg`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        triggerDownload(url, `${safeName}.svg`);
       });
     } else {
       runExportWithoutHighlight(() => {
@@ -568,13 +578,11 @@ function App() {
           canvas.toBlob((blob) => {
             if (!blob) return;
             const pngUrl = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = pngUrl;
-            anchor.download = `${safeName}.png`;
-            anchor.click();
-            URL.revokeObjectURL(pngUrl);
+            triggerDownload(pngUrl, `${safeName}.png`);
           });
-          URL.revokeObjectURL(url);
+          window.setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 1500);
         };
         image.src = url;
       });
