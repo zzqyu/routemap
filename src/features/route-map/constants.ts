@@ -8,7 +8,8 @@ export const headerHeight = 72;
 export const rowHeight = 60;
 export const leftPad = 20;
 export const rightPad = 20;
-export const turnRadius = 14;
+export const turnRadius = 10;
+export const cornerStationGap = 18;
 export const routeLineStrokeWidth = 3.2;
 export const lineStartX = leftPad;
 export const lineEndX = canvasWidth - rightPad;
@@ -23,7 +24,7 @@ export const defaultLayoutOverride: LayoutOverride = {
   lineStartX,
   lineEndX,
   turnRadius,
-  cornerStationGap: turnRadius,
+  cornerStationGap,
 };
 
 export const themes: Record<ThemeName, Theme> = {
