@@ -63,6 +63,7 @@ function App() {
   const [exportScale, setExportScale] = useState(3);
   const [exportFileName, setExportFileName] = useState('');
   const [exportWhiteBg, setExportWhiteBg] = useState(true);
+  const [downloadFallback, setDownloadFallback] = useState<{ url: string; filename: string } | null>(null);
   const [stageTouched, setStageTouched] = useState<StageTouched>({
     route: false,
     global: false,
@@ -538,6 +539,10 @@ function App() {
     anchor.click();
     anchor.remove();
 
+    // 브라우저 사용자 제스처 제한으로 자동 다운로드가 막히는 경우를 대비해
+    // 모달에 수동 다운로드 링크를 노출한다.
+    setDownloadFallback({ url, filename });
+
     window.setTimeout(() => {
       URL.revokeObjectURL(url);
     }, 1500);
@@ -545,6 +550,7 @@ function App() {
 
   function submitExport() {
     if (!detail) return;
+    setDownloadFallback(null);
     const safeName = (exportFileName.trim() || `route-${detail.route.routeName}-${direction}`).replace(/[\\/:*?"<>|]/g, '_');
 
     if (exportFormat === 'svg') {
@@ -589,7 +595,6 @@ function App() {
     }
 
     touchStage('export');
-    setIsExportModalOpen(false);
   }
 
   const connectorTargetId =
@@ -1087,6 +1092,13 @@ function App() {
               <button type="button" onClick={() => setIsExportModalOpen(false)}>취소</button>
               <button type="button" onClick={submitExport}>내보내기</button>
             </div>
+            {downloadFallback && (
+              <p style={{ marginTop: 10, fontSize: 13 }}>
+                자동 다운로드가 차단되면
+                {' '}
+                <a href={downloadFallback.url} download={downloadFallback.filename}>여기를 눌러 수동 다운로드</a>
+              </p>
+            )}
           </div>
         </div>
       )}
