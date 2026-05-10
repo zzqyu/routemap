@@ -241,6 +241,114 @@ h2 {
   padding: 0;
 }
 
+.route-search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0;
+}
+
+.route-select-field {
+  margin-top: 0 !important;
+}
+
+.route-search-row input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.route-search-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0 10px 0 0;
+  border-left: 0;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.route-search-button:hover {
+  border-color: #0050a4;
+  background: #0050a4;
+  color: #fff;
+}
+
+.route-search-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 0 0 10px 10px;
+  background: #fff;
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.route-search-results.no-results {
+  background: #f1f5f9;
+}
+
+.route-search-results.no-results .route-result-empty {
+  background: #f1f5f9;
+}
+
+.route-result-empty {
+  min-height: 40px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.route-result-empty-muted {
+  background: transparent;
+  color: #475569;
+}
+
+.route-result-item {
+  width: 100%;
+  text-align: left;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.route-result-item:hover,
+.route-result-item.active {
+  background: #eff6ff;
+  color: #0050a4;
+}
+
+.route-search-results li:last-child .route-result-item {
+  border-bottom: 0;
+}
+
+.route-selected-chip {
+  width: 100%;
+  text-align: left;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -358,7 +466,7 @@ h2 {
 .station-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 3px;
   padding-top: 14px;
   padding-bottom: 14px;
   min-height: 0;
@@ -469,6 +577,11 @@ h2 {
   right: 0;
   top: -9px;
   border-top: 2px solid #1d4ed8;
+  z-index: 2;
+}
+
+.station-item.start-item.out-map::before {
+  border-top-color: #1e40af;
 }
 
 .station-item.end-item::after {
@@ -554,6 +667,7 @@ h2 {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 16px;
   position: sticky;
   top: 0;
@@ -565,7 +679,14 @@ h2 {
 .preview-history-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
+}
+
+.action-divider {
+  width: 1px;
+  height: 20px;
+  background: #cbd5e1;
+  margin: 0 6px;
 }
 
 .preview-service-title {
@@ -581,8 +702,8 @@ h2 {
 }
 
 .icon-button {
-  width: 34px;
-  height: 34px;
+  width: 27px;
+  height: 27px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
@@ -591,6 +712,14 @@ h2 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.fit-button {
+  width: auto;
+  min-width: 35px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .icon-button:hover:not(:disabled) {
@@ -625,6 +754,12 @@ h2 {
   background-size: 20px 20px;
 }
 
+.preview-zoom {
+  transform-origin: top center;
+  width: fit-content;
+  margin: 0 auto;
+}
+
 .preview-export-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -640,6 +775,23 @@ h2 {
   justify-content: center;
   padding: 20px;
   z-index: 50;
+}
+
+.station-panel-modal-backdrop {
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+}
+
+.station-panel-modal-backdrop .export-modal {
+  width: min(320px, 100%);
+  height: 100%;
+  border-radius: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  box-shadow: -12px 0 36px rgba(15, 23, 42, 0.28);
+  overflow: auto;
 }
 
 .export-modal {
@@ -743,6 +895,17 @@ h2 {
     padding-bottom: 14px;
   }
 
+  .preview-header {
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .preview-history-actions {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   .edit-panel {
     grid-area: edit;
     border-left: 1px solid #d8dde6;
@@ -769,15 +932,32 @@ h2 {
   .edit-panel-bottom {
     overflow-y: auto;
   }
+
+  .station-panel-modal-backdrop {
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .station-panel-modal-backdrop .export-modal {
+    width: 100%;
+    max-width: none;
+    height: min(42vh, 440px);
+    border-radius: 14px 14px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.22);
+  }
 }
 
 @media (max-width: 900px) {
   .app-shell {
     display: flex;
     flex-direction: column;
-    height: auto;
-    min-height: 100vh;
-    overflow: auto;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
   }
 
   .mobile-edit-tabs {
@@ -819,7 +999,9 @@ h2 {
     min-width: 0;
     border-right: 0;
     border-bottom: 1px solid #d8dde6;
-    overflow: visible;
+    min-height: 0;
+    height: 38dvh;
+    overflow-y: auto;
   }
 
   .control-panel .stage-nav {
@@ -832,11 +1014,13 @@ h2 {
     border-left: 0;
     border-top: 1px solid #d8dde6;
     display: flex;
-    overflow: visible;
+    min-height: 0;
+    height: 38dvh;
+    overflow-y: auto;
   }
 
   .edit-panel.stations-desktop {
-    overflow: visible;
+    overflow-y: auto;
   }
 
   .edit-panel-top,
@@ -886,11 +1070,24 @@ h2 {
     position: static;
     z-index: auto;
     background: #eef1f5;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .preview-header {
     position: static;
     padding-bottom: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .preview-history-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .preview-service-title {
@@ -899,5 +1096,39 @@ h2 {
 
   .route-map {
     min-width: 640px;
+  }
+
+  .preview-stage {
+    padding: 5px;
+    height: 100%;
+  }
+
+  .preview-zoom {
+    height: 75%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .preview-zoom .route-map {
+    height: 100%;
+    width: auto;
+    min-width: 0;
+  }
+
+  .station-panel-modal-backdrop {
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .station-panel-modal-backdrop .export-modal {
+    width: 100%;
+    max-width: none;
+    height: min(56vh, 520px);
+    border-radius: 14px 14px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
   }
 }

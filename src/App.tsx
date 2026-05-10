@@ -31,9 +31,13 @@ import type {
 } from './features/route-map/types';
 
 function App() {
+  const [queryInput, setQueryInput] = useState('');
   const [query, setQuery] = useState('');
   const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
+  const [routeSelectionTick, setRouteSelectionTick] = useState(0);
+  const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
+  const [attemptedEmptyRouteSearch, setAttemptedEmptyRouteSearch] = useState(false);
   const direction: Direction = '상행';
   const [themeName, setThemeName] = useState<ThemeName | ''>('');
   const [headerLogo, setHeaderLogo] = useState<HeaderLogoKey | ''>('');
@@ -59,6 +63,7 @@ function App() {
   const [isAddStationModalOpen, setIsAddStationModalOpen] = useState(false);
   const [isStationEditModalOpen, setIsStationEditModalOpen] = useState(false);
   const [mobileEditTab, setMobileEditTab] = useState<MobileEditTab>('settings');
+  const [previewScale, setPreviewScale] = useState(1);
   const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
   const [exportScale, setExportScale] = useState(3);
   const [exportFileName, setExportFileName] = useState('');
@@ -73,9 +78,36 @@ function App() {
     export: false,
   });
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const previewStageRef = useRef<HTMLDivElement | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const snapshotRef = useRef<HistorySnapshot | null>(null);
   const selectedHeaderLogo: HeaderLogoKey = headerLogo || 'gbus';
+
+  function getRouteNameStyle(routeTypeCd?: string): React.CSSProperties {
+    const code = String(routeTypeCd || '').trim();
+    if (code === '16') return { color: '#e60012', fontWeight: 700 };
+    if (code === '11' || code === '14' || code === '21') return { color: '#e60012', fontWeight: 700 };
+    if (code === '12' || code === '22' || code === '42') return { color: '#0068b7', fontWeight: 700 };
+    if (code === '13' || code === '23') return { color: '#33CC99', fontWeight: 700 };
+    if (code === '30') return { color: '#ffc600', fontWeight: 700 };
+    if (code === '15') return { color: '#bb2266', fontWeight: 700 };
+    return { color: '#6b7280', fontWeight: 700 };
+  }
+
+  function getDefaultThemeByRouteType(routeTypeCd?: string): ThemeName {
+    const code = String(routeTypeCd || '').trim();
+    if (code === '14') return 'black';
+    if (code === '16' || code === '11' || code === '21' || code === '15') return 'red';
+    if (code === '12' || code === '22' || code === '42') return 'gyeonggi-blue';
+    if (code === '13' || code === '23') return 'teal';
+    if (code === '30') return 'yellow';
+    return 'black';
+  }
+
+  function getDefaultHeaderLogoByRouteName(routeName?: string): HeaderLogoKey {
+    const normalized = String(routeName || '').trim().toUpperCase();
+    return normalized.startsWith('M') ? 'mbus' : 'gbus';
+  }
 
   function touchStage(stage: StageKey) {
     setStageTouched((prev) => (prev[stage] ? prev : { ...prev, [stage]: true }));
@@ -166,12 +198,36 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [undoHistory, redoHistory]);
 
+  function submitRouteSearch() {
+    touchStage('route');
+    const keyword = queryInput.trim();
+    if (!keyword) {
+      setAttemptedEmptyRouteSearch(true);
+      setHasSearchedRoute(false);
+      setRoutes([]);
+      setQuery('');
+      return;
+    }
+
+    setAttemptedEmptyRouteSearch(false);
+    setQuery(keyword);
+    setHasSearchedRoute(true);
+  }
+
   useEffect(() => {
     const controller = new AbortController();
     fetch(`${apiBase}/routes?q=${encodeURIComponent(query)}&limit=40`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data: RouteSummary[]) => {
         setRoutes(data);
+        if (selectedRouteId && !data.some((route) => route.routeId === selectedRouteId)) {
+          setSelectedRouteId('');
+          setDetail(null);
+          setMessage('검색 결과가 바뀌어 기존 노선 선택이 해제되었습니다. 다시 선택해 주세요.');
+        }
+        if (!data.length) {
+          setMessage('검색 결과가 없습니다.');
+        }
       })
       .catch((error) => {
         if (error.name !== 'AbortError') setMessage(`노선 검색 실패: ${error.message}`);
@@ -191,7 +247,7 @@ function App() {
         setMessage(data.stations.length ? '' : `${direction} 정류장 데이터가 없습니다.`);
       })
       .catch((error) => setMessage(`노선 상세 조회 실패: ${error.message}`));
-  }, [selectedRouteId]);
+  }, [selectedRouteId, routeSelectionTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -530,6 +586,43 @@ function App() {
     });
   }
 
+  function zoomPreview(delta: number) {
+    setPreviewScale((prev) => Math.min(2.5, Math.max(0.4, Number((prev + delta).toFixed(2)))));
+  }
+
+  function fitPreviewToStage() {
+    const stageEl = previewStageRef.current;
+    const svgEl = svgRef.current;
+    if (!stageEl || !svgEl) {
+      setPreviewScale(1);
+      return;
+    }
+    const stageRect = stageEl.getBoundingClientRect();
+    const svgRect = svgEl.getBoundingClientRect();
+    const baseWidth = svgRect.width / Math.max(previewScale, 0.0001);
+    const baseHeight = svgRect.height / Math.max(previewScale, 0.0001);
+    const widthScale = (stageRect.width - 16) / Math.max(baseWidth, 1);
+    const heightScale = (stageRect.height - 16) / Math.max(baseHeight, 1);
+    const next = Math.min(widthScale, heightScale, 2.5);
+    const fittedScale = Math.min(2.5, Math.max(0.4, Number(next.toFixed(2))));
+    setPreviewScale(fittedScale);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const maxLeft = Math.max(stageEl.scrollWidth - stageEl.clientWidth, 0);
+        const maxTop = Math.max(stageEl.scrollHeight - stageEl.clientHeight, 0);
+        stageEl.scrollLeft = maxLeft / 2;
+        stageEl.scrollTop = window.innerWidth <= 900 ? 0 : maxTop / 2;
+      });
+    });
+  }
+
+  useEffect(() => {
+    if (!detail) return;
+    requestAnimationFrame(() => {
+      fitPreviewToStage();
+    });
+  }, [selectedRouteId, detail]);
+
   function triggerDownload(url: string, filename: string) {
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -703,6 +796,11 @@ function App() {
     return hasRouteSelection;
   };
 
+  const startMarkerStationId = useMemo(() => {
+    if (effectiveStartId && displayedStationIds.has(effectiveStartId)) return effectiveStartId;
+    return filteredStationCatalog.find((station) => displayedStationIds.has(station.stationId))?.stationId ?? '';
+  }, [effectiveStartId, filteredStationCatalog, displayedStationIds]);
+
   return (
     <main className="app-shell">
       <aside
@@ -728,36 +826,61 @@ function App() {
           <summary>기본 설정</summary>
           <h3 className="panel-title">기본 설정 편집</h3>
           <label className="field">
-            노선 검색
-            <input
-              value={query}
-              onChange={(event) => {
-                touchStage('route');
-                setQuery(event.target.value);
-              }}
-              placeholder="노선번호, 기종점, 지역명"
-            />
+            노선 검색/선택
+            <div className="route-search-row">
+              <input
+                value={queryInput}
+                onChange={(event) => {
+                  touchStage('route');
+                  setQueryInput(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitRouteSearch();
+                  }
+                }}
+                placeholder="노선명 키워드"
+              />
+              <button type="button" className="route-search-button" onClick={submitRouteSearch}>검색</button>
+            </div>
           </label>
 
-          <label className="field">
-            노선 선택
-            <select
-              value={selectedRouteId}
-              onChange={(event) => {
-                touchStage('route');
-                setSelectedRouteId(event.target.value);
-              }}
-            >
-              <option value="" disabled>
-                노선 선택
-              </option>
-              {routes.map((route) => (
-                <option key={route.routeId} value={route.routeId}>
-                  {route.routeName} · {route.startStationName} → {route.endStationName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field route-select-field">
+            {
+              <ul
+                className={`route-search-results ${hasSearchedRoute && routes.length === 0 ? 'no-results' : ''}`}
+                role="listbox"
+                aria-label="노선 검색 결과"
+              >
+                {!hasSearchedRoute && (
+                  <li className="route-result-empty">
+                    {attemptedEmptyRouteSearch ? '노선명 키워드를 입력하세요.' : '노선을 검색하세요.'}
+                  </li>
+                )}
+                {hasSearchedRoute &&
+                  routes.map((route) => (
+                    <li key={route.routeId}>
+                      <button
+                        type="button"
+                        className={`route-result-item ${selectedRouteId === route.routeId ? 'active' : ''}`}
+                        onClick={() => {
+                          touchStage('route');
+                          setSelectedRouteId(route.routeId);
+                          setThemeName(getDefaultThemeByRouteType(route.routeTypeCd));
+                          setHeaderLogo(getDefaultHeaderLogoByRouteName(route.routeName));
+                          setRouteSelectionTick((prev) => prev + 1);
+                          setMessage('');
+                        }}
+                      >
+                        <span style={getRouteNameStyle(route.routeTypeCd)}>{route.routeName}</span> · {route.startStationName} → {route.endStationName}
+                      </button>
+                    </li>
+                  ))}
+                {hasSearchedRoute && routes.length === 0 && <li className="route-result-empty route-result-empty-muted">검색 결과가 없습니다.</li>}
+              </ul>
+            }
+          </div>
 
           <label className="field">
             <span className="field-head">
@@ -953,11 +1076,36 @@ function App() {
 
       <section className="preview-panel">
         <div className="preview-header">
-          <div>
-            <h1>노선안내도 Generator</h1>
-            <p className="eyebrow">Preview</p>
-          </div>
+          <h1>노선안내도 Generator</h1>
           <div className="preview-history-actions" aria-label="히스토리 액션">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => zoomPreview(-0.1)}
+              title="축소"
+              aria-label="축소"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => zoomPreview(0.1)}
+              title="확대"
+              aria-label="확대"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="icon-button fit-button"
+              onClick={fitPreviewToStage}
+              title="화면에 맞게"
+              aria-label="화면에 맞게"
+            >
+              FIT
+            </button>
+            <span className="action-divider" aria-hidden="true" />
             <button
               type="button"
               className="icon-button"
@@ -984,6 +1132,7 @@ function App() {
                 <path d="M17.5 18H9.2C5.8 18 3 15.2 3 11.8C3 8.4 5.8 5.6 9.2 5.6H15.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
+            <span className="action-divider" aria-hidden="true" />
             <button
               type="button"
               className="icon-button"
@@ -1007,24 +1156,26 @@ function App() {
             </button>
           </div>
         </div>
-        <div className="preview-stage">
-          <RouteMapPreview
-            detail={detail}
-            theme={theme}
-            sourceStations={sourceStations}
-            layoutOverride={layoutOverride}
-            stationOverrides={stationOverrides}
-            effectiveStartId={effectiveStartId}
-            effectiveEndId={effectiveEndId}
-            connectorTargetId={connectorTargetId}
-            selectedStationId={selectedStationId}
-            headerLogoKey={selectedHeaderLogo}
-            headerLogo={headerLogoOptions[selectedHeaderLogo]}
-            terminalText={terminalText}
-            highlightKey={highlightKey}
-            onSelectStation={setSelectedStationId}
-            svgRef={svgRef}
-          />
+        <div className="preview-stage" ref={previewStageRef}>
+          <div className="preview-zoom" style={{ transform: `scale(${previewScale})` }}>
+            <RouteMapPreview
+              detail={detail}
+              theme={theme}
+              sourceStations={sourceStations}
+              layoutOverride={layoutOverride}
+              stationOverrides={stationOverrides}
+              effectiveStartId={effectiveStartId}
+              effectiveEndId={effectiveEndId}
+              connectorTargetId={connectorTargetId}
+              selectedStationId={selectedStationId}
+              headerLogoKey={selectedHeaderLogo}
+              headerLogo={headerLogoOptions[selectedHeaderLogo]}
+              terminalText={terminalText}
+              highlightKey={highlightKey}
+              onSelectStation={setSelectedStationId}
+              svgRef={svgRef}
+            />
+          </div>
         </div>
       </section>
 
@@ -1104,7 +1255,7 @@ function App() {
       )}
 
       {isAddStationModalOpen && (
-        <div className="export-modal-backdrop" role="dialog" aria-modal="true" aria-label="사용자 정의 정류장 추가">
+        <div className="export-modal-backdrop station-panel-modal-backdrop" role="dialog" aria-modal="true" aria-label="사용자 정의 정류장 추가">
           <div className="export-modal">
             <h3>사용자 정의 정류장 추가</h3>
             <p className="message">선택한 {selectedStationName || '정류장'} 정류장 다음에 추가됩니다.</p>
@@ -1130,7 +1281,7 @@ function App() {
       )}
 
       {isStationEditModalOpen && selectedStationId && (
-        <div className="export-modal-backdrop" role="dialog" aria-modal="true" aria-label="정류장 편집">
+        <div className="export-modal-backdrop station-panel-modal-backdrop" role="dialog" aria-modal="true" aria-label="정류장 편집">
           <div className="export-modal station-edit-modal">
             <h3>정류장 편집</h3>
             <div className="station-edit-modal-body">
@@ -1162,8 +1313,7 @@ function App() {
                   >
                     <option value="emphasis">강조 정류장 표시</option>
                     <option value="normal">일반 정류장 표시</option>
-                    <option value="intercityTransfer">광역버스 환승 가능 정류장</option>
-                    <option value="subwayTransfer">지하철 환승가능 정류장</option>
+                    {/* TODO: 환승 - 광역버스/지하철 환승 유형 옵션 재노출 및 개선 */}
                   </select>
                 </label>
 
@@ -1271,7 +1421,6 @@ function App() {
 
       <aside className={`edit-panel stations-desktop ${mobileEditTab === 'stations' ? '' : 'mobile-hidden'}`}>
         <div className="edit-panel-top">
-          <h3 className="panel-title">정류장 목록 편집</h3>
           <div className={`station-action-row ${selectedStationId ? '' : 'disabled'} ${hasStationResetChanges ? '' : 'reset-disabled'}`}>
             <button type="button" className="icon-button station-action-icon" onClick={() => setIsAddStationModalOpen(true)} disabled={!selectedStationId} title="추가" aria-label="정류장 추가">
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -1354,7 +1503,7 @@ function App() {
                 className={`station-item ${
                   selectedStationId === station.stationId ? 'active' : ''
                 } ${displayedStationIds.has(station.stationId) ? 'in-map' : 'out-map'} ${
-                  station.stationId === effectiveStartId ? 'start-item' : ''
+                  station.stationId === startMarkerStationId ? 'start-item' : ''
                 } ${station.stationId === effectiveEndId ? 'end-item' : ''}`}
                 onClick={() => {
                   touchStage('stationBasic');
@@ -1366,7 +1515,7 @@ function App() {
                   {station.isCustom ? ' (사용자정의)' : ''}
                 </span>
                 <small>{directionLabel}</small>
-                {station.stationId === effectiveStartId && <em className="item-comment top">출발 정류장</em>}
+                {station.stationId === startMarkerStationId && <em className="item-comment top">출발 정류장</em>}
                 {station.stationId === effectiveEndId && <em className="item-comment bottom">도착 정류장</em>}
               </button>
                 );
