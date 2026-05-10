@@ -4,14 +4,18 @@ import { RouteMapPreview } from './features/route-map/components/RouteMapPreview
 import {
   apiBase,
   defaultLayoutOverride,
+  defaultTypographySettings,
   headerLogoOptions,
+  presetFontFamilies,
   themes,
 } from './features/route-map/constants';
 import { formatTerminal, getEndpointIds } from './features/route-map/lib/route';
 import { buildDisplayedStations } from './features/route-map/lib/station';
 import type {
   Direction,
+  EditCategoryKey,
   ExportFormat,
+  FontOption,
   HeaderLogoKey,
   HighlightKey,
   HistorySnapshot,
@@ -28,6 +32,8 @@ import type {
   StationPointMode,
   StationRole,
   ThemeName,
+  TypographySettings,
+  TypographyStyle,
 } from './features/route-map/types';
 
 function App() {
@@ -42,6 +48,12 @@ function App() {
   const [themeName, setThemeName] = useState<ThemeName | ''>('');
   const [headerLogo, setHeaderLogo] = useState<HeaderLogoKey | ''>('');
   const [layoutOverride, setLayoutOverride] = useState<LayoutOverride>(defaultLayoutOverride);
+  const [typographySettings, setTypographySettings] = useState<TypographySettings>(defaultTypographySettings);
+  const [editCategory, setEditCategory] = useState<EditCategoryKey>('terminal');
+  const [fontOptions, setFontOptions] = useState<FontOption[]>(presetFontFamilies);
+  const [isClient, setIsClient] = useState(false);
+  const [localFontsLoaded, setLocalFontsLoaded] = useState(false);
+  const [showFontLicenseNotice, setShowFontLicenseNotice] = useState(false);
   const [stationOverrides, setStationOverrides] = useState<Record<string, StationOverride>>({});
   const [selectedStationId, setSelectedStationId] = useState<string>('');
   const [stationCatalog, setStationCatalog] = useState<StationListItem[]>([]);
@@ -82,6 +94,11 @@ function App() {
   const highlightTimerRef = useRef<number | null>(null);
   const snapshotRef = useRef<HistorySnapshot | null>(null);
   const selectedHeaderLogo: HeaderLogoKey = headerLogo || 'gbus';
+  const localFontsSupported = isClient && typeof (window as Window & { queryLocalFonts?: () => Promise<Array<{ family: string }>> }).queryLocalFonts === 'function';
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   function getRouteNameStyle(routeTypeCd?: string): React.CSSProperties {
     const code = String(routeTypeCd || '').trim();
@@ -125,21 +142,43 @@ function App() {
       headerLogo,
       customTerminalText,
       layoutOverride: { ...layoutOverride },
+      typographySettings: JSON.parse(JSON.stringify(typographySettings)),
       stationOverrides: JSON.parse(JSON.stringify(stationOverrides)),
       stationCatalog: stationCatalog.map((item) => ({ ...item, directions: [...item.directions] })),
       selectedStationId,
     };
-  }, [themeName, headerLogo, customTerminalText, layoutOverride, stationOverrides, stationCatalog, selectedStationId]);
+  }, [themeName, headerLogo, customTerminalText, layoutOverride, typographySettings, stationOverrides, stationCatalog, selectedStationId]);
 
   const applySnapshot = useCallback((snapshot: HistorySnapshot) => {
     setThemeName(snapshot.themeName);
     setHeaderLogo(snapshot.headerLogo);
     setCustomTerminalText(snapshot.customTerminalText);
     setLayoutOverride(snapshot.layoutOverride);
+    setTypographySettings(snapshot.typographySettings ?? defaultTypographySettings);
     setStationOverrides(snapshot.stationOverrides);
     setStationCatalog(snapshot.stationCatalog);
     setSelectedStationId(snapshot.selectedStationId);
   }, []);
+
+  async function loadLocalFonts() {
+    if (!localFontsSupported) return;
+    setShowFontLicenseNotice(true);
+    try {
+      const api = (window as unknown as { queryLocalFonts: () => Promise<Array<{ family: string }>> }).queryLocalFonts;
+      const localFonts = await api();
+      const localOptions: FontOption[] = [...new Set(localFonts.map((item) => item.family.trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'ko'))
+        .map((family) => ({ id: family, label: `${family} (기기 폰트)`, source: 'local' as const }));
+      const merged = [...presetFontFamilies];
+      localOptions.forEach((option) => {
+        if (!merged.some((base) => base.id === option.id)) merged.push(option);
+      });
+      setFontOptions(merged);
+      setLocalFontsLoaded(true);
+    } catch (error) {
+      setMessage(`기기 폰트 조회 실패: ${(error as Error).message}`);
+    }
+  }
 
   function commitHistory() {
     const current = snapshotRef.current;
@@ -460,8 +499,14 @@ function App() {
     });
   }
 
-  function resetLayoutField<K extends keyof LayoutOverride>(key: K) {
-    setLayoutOverride((prev) => ({ ...prev, [key]: defaultLayoutOverride[key] }));
+  function updateTypography<K extends keyof TypographyStyle>(target: keyof TypographySettings, key: K, value: TypographyStyle[K]) {
+    setTypographySettings((prev) => ({
+      ...prev,
+      [target]: {
+        ...prev[target],
+        [key]: value,
+      },
+    }));
   }
 
   function addCustomStation() {
@@ -918,46 +963,10 @@ function App() {
             </select>
           </label>
 
-          <label className="field">
-            출발-도착지 텍스트
-            <input
-              value={customTerminalText}
-              onChange={(event) => {
-                commitHistory();
-                touchStage('global');
-                setCustomTerminalText(event.target.value);
-                pulseHighlight('terminal');
-              }}
-              placeholder="비워두면 자동(기본값)"
-            />
-          </label>
-
-          <label className="field">
-            헤더 로고
-            <select
-              value={headerLogo}
-              onChange={(event) => {
-                commitHistory();
-                touchStage('global');
-                setHeaderLogo(event.target.value as HeaderLogoKey);
-                pulseHighlight('header');
-              }}
-            >
-              <option value="" disabled>
-                로고 선택
-              </option>
-              {Object.entries(headerLogoOptions).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {value.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </details>
 
         <details className="panel-group layout-group" open={activeStage === 'layout'}>
           <summary>레이아웃 조정</summary>
-          <h3 className="panel-title">레이아웃 편집</h3>
           {layoutWarnings.length > 0 && (
             <div className="layout-warning-box">
               <p className="layout-warning-title">충돌/가독성 경고 {layoutWarnings.length}건</p>
@@ -975,100 +984,152 @@ function App() {
             </div>
           )}
           <label className="field">
-            <span className="field-head">
-              정류장명 각도: {layoutOverride.labelAngle}도
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('labelAngle'); pulseHighlight('labels'); }}>
-                reset
-              </button>
-            </span>
-            <input
-              type="range"
-              min="-70"
-              max="-30"
-              value={layoutOverride.labelAngle}
-              onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, labelAngle: Number(event.target.value) })); pulseHighlight('labels'); }}
-            />
+            편집 항목 선택
+            <select value={editCategory} onChange={(event) => setEditCategory(event.target.value as EditCategoryKey)}>
+              <option value="terminal">출발-도착지</option>
+              <option value="routeInfo">노선정보</option>
+              <option value="stationLabel">정류장명</option>
+              <option value="headerTitle">노선안내도 헤더</option>
+              <option value="routeName">노선명</option>
+              <option value="line">노선선</option>
+              <option value="layout">레이아웃</option>
+            </select>
           </label>
 
-          <label className="field">
-            <span className="field-head">
-              행 간격: {layoutOverride.rowHeight}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('rowHeight'); pulseHighlight('line'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="48" max="80" value={layoutOverride.rowHeight} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, rowHeight: Number(event.target.value) })); pulseHighlight('line'); }} />
-          </label>
+            {editCategory === 'terminal' && (
+              <label className="field">
+                출발-도착지 텍스트
+                <input
+                  value={customTerminalText}
+                  onChange={(event) => {
+                    commitHistory();
+                    touchStage('global');
+                    setCustomTerminalText(event.target.value);
+                    pulseHighlight('terminal');
+                  }}
+                  placeholder="비워두면 자동(기본값)"
+                />
+              </label>
+            )}
 
-          <label className="field">
-            <span className="field-head">
-              노선선 두께: {layoutOverride.lineStrokeWidth.toFixed(1)}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('lineStrokeWidth'); pulseHighlight('line'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="2" max="6" step="0.2" value={layoutOverride.lineStrokeWidth} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: Number(event.target.value) })); pulseHighlight('line'); }} />
-          </label>
+            {editCategory === 'headerTitle' && (
+              <label className="field">
+                헤더 로고
+                <select
+                  value={headerLogo}
+                  onChange={(event) => {
+                    commitHistory();
+                    touchStage('global');
+                    setHeaderLogo(event.target.value as HeaderLogoKey);
+                    pulseHighlight('header');
+                  }}
+                >
+                  <option value="" disabled>
+                    로고 선택
+                  </option>
+                  {Object.entries(headerLogoOptions).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
-          <label className="field">
-            <span className="field-head">
-              노선명 크기: {layoutOverride.routeNameFontSize}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('routeNameFontSize'); pulseHighlight('routeName'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="24" max="44" value={layoutOverride.routeNameFontSize} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, routeNameFontSize: Number(event.target.value) })); pulseHighlight('routeName'); }} />
-          </label>
+            {(['terminal', 'routeInfo', 'stationLabel', 'headerTitle', 'routeName'] as Array<keyof TypographySettings>).includes(editCategory as keyof TypographySettings) && (
+              <>
+                <label className="field">
+                  <span className="field-head">
+                    폰트 패밀리
+                    <span style={{ display: 'inline-flex', gap: 6 }}>
+                      <button type="button" className="mini-reset" onClick={loadLocalFonts} disabled={!localFontsSupported || localFontsLoaded}>
+                        {localFontsSupported ? (localFontsLoaded ? '기기폰트로드 완료' : '기기폰트로드') : '기기폰트 미지원'}
+                      </button>
+                      <button
+                        type="button"
+                        className="mini-reset"
+                        onClick={() => {
+                          touchStage('global');
+                          updateTypography(
+                            editCategory as keyof TypographySettings,
+                            'fontFamily',
+                            defaultTypographySettings[editCategory as keyof TypographySettings].fontFamily,
+                          );
+                        }}
+                      >
+                        reset
+                      </button>
+                    </span>
+                  </span>
+                  <select
+                    value={typographySettings[editCategory as keyof TypographySettings].fontFamily}
+                    onChange={(event) => {
+                      commitHistory();
+                      touchStage('global');
+                      updateTypography(editCategory as keyof TypographySettings, 'fontFamily', event.target.value);
+                    }}
+                  >
+                    {fontOptions.map((option) => (
+                      <option key={option.id} value={option.id}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
 
-          <label className="field">
-            <span className="field-head">
-              출발/도착 점 크기: {layoutOverride.terminalMarkerRadius.toFixed(1)}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('terminalMarkerRadius'); pulseHighlight('station'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="2.5" max="5" step="0.1" value={layoutOverride.terminalMarkerRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: Number(event.target.value) })); pulseHighlight('station'); }} />
-          </label>
+                {showFontLicenseNotice && (
+                  <div className="font-license-notice">
+                    <p>[!] 기기 폰트 사용 시 해당 폰트 라이선스와 사용 권한은 사용자 책임입니다. 상업적 이용 또는 외부 배포 전 폰트 라이선스를 확인하세요.</p>
+                  </div>
+                )}
 
-          <label className="field">
-            <span className="field-head">
-              좌측 기준선: {layoutOverride.lineStartX}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('lineStartX'); pulseHighlight('line'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="8" max="120" value={layoutOverride.lineStartX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStartX: Number(event.target.value) })); pulseHighlight('line'); }} />
-          </label>
+                <label className="field">
+                  <span className="field-head">
+                    폰트 크기: {typographySettings[editCategory as keyof TypographySettings].fontSize}
+                    <button type="button" className="mini-reset" onClick={() => updateTypography(editCategory as keyof TypographySettings, 'fontSize', defaultTypographySettings[editCategory as keyof TypographySettings].fontSize)}>reset</button>
+                  </span>
+                  <input type="range" min="2" max="200" step="1" value={typographySettings[editCategory as keyof TypographySettings].fontSize} onChange={(event) => { commitHistory(); touchStage('global'); updateTypography(editCategory as keyof TypographySettings, 'fontSize', Number(event.target.value)); }} />
+                </label>
 
-          <label className="field">
-            <span className="field-head">
-              우측 기준선: {layoutOverride.lineEndX}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('lineEndX'); pulseHighlight('line'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="380" max="492" value={layoutOverride.lineEndX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineEndX: Number(event.target.value) })); pulseHighlight('line'); }} />
-          </label>
+                <label className="field">
+                  <span className="field-head">
+                    자간: {typographySettings[editCategory as keyof TypographySettings].letterSpacing.toFixed(2)}
+                    <button type="button" className="mini-reset" onClick={() => updateTypography(editCategory as keyof TypographySettings, 'letterSpacing', defaultTypographySettings[editCategory as keyof TypographySettings].letterSpacing)}>reset</button>
+                  </span>
+                  <input type="range" step="0.05" min="-3" max="3" value={typographySettings[editCategory as keyof TypographySettings].letterSpacing} onChange={(event) => { commitHistory(); touchStage('global'); updateTypography(editCategory as keyof TypographySettings, 'letterSpacing', Number(event.target.value)); }} />
+                </label>
 
-          <label className="field">
-            <span className="field-head">
-              유턴 반경: {layoutOverride.turnRadius}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('turnRadius'); pulseHighlight('line'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="8" max="30" value={layoutOverride.turnRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, turnRadius: Number(event.target.value) })); pulseHighlight('line'); }} />
-          </label>
+                <label className="field">
+                  <span className="field-head">
+                    장평(%): {typographySettings[editCategory as keyof TypographySettings].fontStretchPercent}
+                    <button type="button" className="mini-reset" onClick={() => updateTypography(editCategory as keyof TypographySettings, 'fontStretchPercent', defaultTypographySettings[editCategory as keyof TypographySettings].fontStretchPercent)}>reset</button>
+                  </span>
+                  <input type="range" min="50" max="130" step="1" value={typographySettings[editCategory as keyof TypographySettings].fontStretchPercent} onChange={(event) => { commitHistory(); touchStage('global'); updateTypography(editCategory as keyof TypographySettings, 'fontStretchPercent', Number(event.target.value)); }} />
+                </label>
+              </>
+            )}
 
-          <label className="field">
-            <span className="field-head">
-              유턴-인접정류장 간격: {layoutOverride.cornerStationGap}
-              <button type="button" className="mini-reset" onClick={() => { touchStage('layout'); resetLayoutField('cornerStationGap'); pulseHighlight('line'); }}>
-                reset
-              </button>
-            </span>
-            <input type="range" min="8" max="32" value={layoutOverride.cornerStationGap} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, cornerStationGap: Number(event.target.value) })); pulseHighlight('line'); }} />
-          </label>
+            {editCategory === 'stationLabel' && (
+              <label className="field">
+                <span className="field-head">정류장명 각도: {layoutOverride.labelAngle}도<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, labelAngle: defaultLayoutOverride.labelAngle }))}>reset</button></span>
+                <input type="range" min="-70" max="-30" value={layoutOverride.labelAngle} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, labelAngle: Number(event.target.value) })); pulseHighlight('labels'); }} />
+              </label>
+            )}
+
+            {editCategory === 'line' && (
+              <>
+                <label className="field"><span className="field-head">노선선 두께: {layoutOverride.lineStrokeWidth.toFixed(1)}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: defaultLayoutOverride.lineStrokeWidth }))}>reset</button></span><input type="range" min="2" max="6" step="0.2" value={layoutOverride.lineStrokeWidth} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+                <label className="field"><span className="field-head">점 크기: {layoutOverride.terminalMarkerRadius.toFixed(1)}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: defaultLayoutOverride.terminalMarkerRadius }))}>reset</button></span><input type="range" min="2.5" max="5" step="0.1" value={layoutOverride.terminalMarkerRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: Number(event.target.value) })); pulseHighlight('station'); }} /></label>
+                <label className="field"><span className="field-head">유턴 반경: {layoutOverride.turnRadius}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, turnRadius: defaultLayoutOverride.turnRadius }))}>reset</button></span><input type="range" min="8" max="30" value={layoutOverride.turnRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, turnRadius: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+                <label className="field"><span className="field-head">유턴-인접정류장 간격: {layoutOverride.cornerStationGap}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, cornerStationGap: defaultLayoutOverride.cornerStationGap }))}>reset</button></span><input type="range" min="8" max="32" value={layoutOverride.cornerStationGap} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, cornerStationGap: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+              </>
+            )}
+
+            {editCategory === 'layout' && (
+              <>
+                <label className="field"><span className="field-head">좌측 기준선: {layoutOverride.lineStartX}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, lineStartX: defaultLayoutOverride.lineStartX }))}>reset</button></span><input type="range" min="8" max="120" value={layoutOverride.lineStartX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStartX: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+                <label className="field"><span className="field-head">우측 기준선: {layoutOverride.lineEndX}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, lineEndX: defaultLayoutOverride.lineEndX }))}>reset</button></span><input type="range" min="380" max="492" value={layoutOverride.lineEndX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineEndX: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+              </>
+            )}
+
         </details>
 
         {message && <p className="message">{message}</p>}
@@ -1171,6 +1232,7 @@ function App() {
               headerLogoKey={selectedHeaderLogo}
               headerLogo={headerLogoOptions[selectedHeaderLogo]}
               terminalText={terminalText}
+              typographySettings={typographySettings}
               highlightKey={highlightKey}
               onSelectStation={setSelectedStationId}
               svgRef={svgRef}

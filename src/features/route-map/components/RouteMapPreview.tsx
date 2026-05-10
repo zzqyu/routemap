@@ -3,7 +3,7 @@ import { buildDisplayedStations } from '../lib/station';
 import { buildLayout, buildRoutePath } from '../lib/layout';
 import { getLabelMetrics, splitStationName } from '../lib/label';
 import { canvasWidth, highlightColor, rightPad, topPadding } from '../constants';
-import type { HeaderLogoKey, HeaderLogoOption, HighlightKey, LayoutOverride, RouteDetailResponse, RouteStation, StationOverride, Theme } from '../types';
+import type { HeaderLogoKey, HeaderLogoOption, HighlightKey, LayoutOverride, RouteDetailResponse, RouteStation, StationOverride, Theme, TypographySettings } from '../types';
 
 type RouteMapPreviewProps = {
   detail: RouteDetailResponse | null;
@@ -18,6 +18,7 @@ type RouteMapPreviewProps = {
   headerLogoKey: HeaderLogoKey;
   headerLogo: HeaderLogoOption;
   terminalText: string;
+  typographySettings: TypographySettings;
   highlightKey: HighlightKey;
   onSelectStation: (stationId: string) => void;
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -36,6 +37,7 @@ export function RouteMapPreview({
   headerLogoKey,
   headerLogo,
   terminalText,
+  typographySettings,
   highlightKey,
   onSelectStation,
   svgRef,
@@ -84,14 +86,20 @@ export function RouteMapPreview({
   const displayRouteName = headerLogoKey === 'mbus' && /^m/i.test(routeName) ? routeName.replace(/^m\s*/i, '') : routeName;
   const showMbusPrefix = headerLogoKey === 'mbus';
   const routeNameFontSize = layoutOverride.routeNameFontSize;
+  const effectiveRouteNameFontSize = typographySettings.routeName.fontSize || routeNameFontSize;
   const routeNameY = topPadding + 42;
   const routeNameRightX = canvasWidth - rightPad;
-  const routeNameApproxWidth = Math.max(1, displayRouteName.length) * routeNameFontSize * 0.55;
+  const routeNameApproxWidth = Math.max(1, displayRouteName.length) * effectiveRouteNameFontSize * 0.55;
   const routeNameLeftX = routeNameRightX - routeNameApproxWidth;
-  const mbusPrefixSize = Math.max(20, Math.round(routeNameFontSize * 1.16));
-  const mbusPrefixGap = Math.max(4, Math.round(routeNameFontSize * 0.12));
-  const mbusPrefixBottomOffset = Math.max(0.5, routeNameFontSize * 0.18);
+  const mbusPrefixSize = Math.max(20, Math.round(effectiveRouteNameFontSize * 1.16));
+  const mbusPrefixGap = Math.round(effectiveRouteNameFontSize * -0.15);
+  const mbusPrefixBottomOffset = effectiveRouteNameFontSize * 0.24;
   const mbusPrefixX = routeNameLeftX - mbusPrefixGap - mbusPrefixSize;
+  const terminalTypography = typographySettings.terminal;
+  const routeInfoTypography = typographySettings.routeInfo;
+  const stationTypography = typographySettings.stationLabel;
+  const headerTitleTypography = typographySettings.headerTitle;
+  const routeNameTypography = typographySettings.routeName;
 
   return (
     <svg
@@ -101,6 +109,7 @@ export function RouteMapPreview({
       viewBox={`0 0 ${canvasWidth} ${layout.height}`}
       role="img"
       aria-label={`${routeName} 노선안내도`}
+      style={{ fontFamily: "'Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif" }}
     >
       <defs>
         <marker
@@ -121,18 +130,43 @@ export function RouteMapPreview({
       <rect x="0" y="0" width={canvasWidth} height={layout.height} fill="#fff" />
       {headerLogo.showHeaderAccent && <path d={`M 180 ${topPadding} H 320 Q 250 ${topPadding + 27} 180 ${topPadding}`} fill={theme.headerAccentColor} opacity="0.95" />}
       <text x="14" y={topPadding + 21} fontSize="10" fontWeight="800" fill={highlightKey === 'terminal' ? highlightColor : theme.routeNumberColor}>
+        <tspan
+          style={{
+            fontFamily: `'${terminalTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`,
+            letterSpacing: `${terminalTypography.letterSpacing}px`,
+          }}
+          fontSize={terminalTypography.fontSize}
+          transform={`scale(${terminalTypography.fontStretchPercent / 100} 1)`}
+        >
         {terminalText}
+        </tspan>
       </text>
-      <text x="14" y={topPadding + 28} fontSize="4.8" fontWeight="700" fill="#111">
-        {detail ? `운송회사: ${detail.route.companyName ?? '-'} / 문의: ${detail.route.companyTel ?? '-'}` : '노선을 선택하세요'}
+      <text x="14" y={topPadding + 28} fontSize={routeInfoTypography.fontSize} fontWeight="700" fill="#111">
+        <tspan
+          style={{
+            fontFamily: `'${routeInfoTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`,
+            letterSpacing: `${routeInfoTypography.letterSpacing}px`,
+          }}
+          transform={`scale(${routeInfoTypography.fontStretchPercent / 100} 1)`}
+        >
+          {detail ? `운송회사: ${detail.route.companyName ?? '-'} / 문의: ${detail.route.companyTel ?? '-'}` : '노선을 선택하세요'}
+        </tspan>
       </text>
       {detail?.scheduleRows.map((row, index) => (
-        <text key={row.label} x="14" y={topPadding + 34 + index * 6} fontSize="4.8" fontWeight="700" fill="#111">
-          {(() => {
-            const [startFirst = '-', endFirst = '-'] = String(row.firstTime ?? '-|-').split('|');
-            const [startLast = '-', endLast = '-'] = String(row.lastTime ?? '-|-').split('|');
-            return `${row.label} 기점 ${startFirst}~${startLast} 종점 ${endFirst}~${endLast} 배차 ${row.intervalText}`;
-          })()}
+        <text key={row.label} x="14" y={topPadding + 34 + index * 6} fontSize={routeInfoTypography.fontSize} fontWeight="700" fill="#111">
+          <tspan
+            style={{
+              fontFamily: `'${routeInfoTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`,
+              letterSpacing: `${routeInfoTypography.letterSpacing}px`,
+            }}
+            transform={`scale(${routeInfoTypography.fontStretchPercent / 100} 1)`}
+          >
+            {(() => {
+              const [startFirst = '-', endFirst = '-'] = String(row.firstTime ?? '-|-').split('|');
+              const [startLast = '-', endLast = '-'] = String(row.lastTime ?? '-|-').split('|');
+              return `${row.label} 기점 ${startFirst}~${startLast} 종점 ${endFirst}~${endLast} 배차 ${row.intervalText}`;
+            })()}
+          </tspan>
         </text>
       ))}
 
@@ -145,7 +179,7 @@ export function RouteMapPreview({
           height={headerLogo.height}
           preserveAspectRatio="xMidYMid meet"
         />
-        <text x={headerLogo.titleX} y={headerLogo.titleY} textAnchor="start" fontSize="13.5" fontWeight="900" fill="#111" dominantBaseline="middle">
+        <text x={headerLogo.titleX} y={headerLogo.titleY} textAnchor="start" fontSize={headerTitleTypography.fontSize} fontWeight="900" fill="#111" dominantBaseline="middle" style={{ fontFamily: `'${headerTitleTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`, letterSpacing: `${headerTitleTypography.letterSpacing}px` }} transform={`scale(${headerTitleTypography.fontStretchPercent / 100} 1)`}>
           {headerLogo.titleText}
         </text>
       </g>
@@ -159,9 +193,19 @@ export function RouteMapPreview({
           preserveAspectRatio="xMidYMid meet"
         />
       )}
-      <text x={routeNameRightX} y={routeNameY} textAnchor="end" fontSize={routeNameFontSize} fontWeight="900" fill={highlightKey === 'routeName' ? highlightColor : theme.routeNumberColor}>
-        {displayRouteName}
-      </text>
+      <g transform={`translate(${routeNameRightX} ${routeNameY}) scale(${routeNameTypography.fontStretchPercent / 100} 1)`}>
+        <text
+          x={0}
+          y={0}
+          textAnchor="end"
+          fontSize={effectiveRouteNameFontSize}
+          fontWeight="900"
+          fill={highlightKey === 'routeName' ? highlightColor : theme.routeNumberColor}
+          style={{ fontFamily: `'${routeNameTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`, letterSpacing: `${routeNameTypography.letterSpacing}px` }}
+        >
+          {displayRouteName}
+        </text>
+      </g>
 
       {routePath && (
         <>
@@ -192,7 +236,8 @@ export function RouteMapPreview({
         const pointMode = override?.pointMode ?? (isTerminal ? 'emphasis' : 'normal');
         const isEmphasis = pointMode === 'emphasis';
         const labelWeight = isEmphasis ? 900 : 700;
-        const labelSize = isEmphasis ? Math.min(6.4, label.fontSize + 0.7) : label.fontSize;
+        const baseLabelSize = stationTypography.fontSize || label.fontSize;
+        const labelSize = isEmphasis ? Math.min(6.4, baseLabelSize + 0.7) : baseLabelSize;
         const { lineHeight, baselineOffset } = getLabelMetrics(label.lines.length, labelSize);
         const labelX = point.xPos - 3;
         const labelY = point.yPos - 5 - baselineOffset;
@@ -288,6 +333,7 @@ export function RouteMapPreview({
               fontSize={labelSize}
               fontWeight={labelWeight}
               fill={highlightKey === 'labels' ? highlightColor : '#111'}
+              style={{ fontFamily: `'${stationTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`, letterSpacing: `${stationTypography.letterSpacing}px` }}
             >
               {label.lines.map((line, index) => (
                 <tspan key={`${point.stationId}-line-${index}`} x={labelX} dy={index === 0 ? 0 : lineHeight}>

@@ -1,6 +1,31 @@
 export type Direction = '상행' | '하행';
 export type ThemeName = 'teal' | 'red' | 'yellow' | 'gyeonggi-blue' | 'black';
 export type HeaderLogoKey = 'gbus' | 'mbus' | 'public_bus';
+export type TypographyTargetKey = 'terminal' | 'routeInfo' | 'stationLabel' | 'headerTitle' | 'routeName';
+
+export type TypographyStyle = {
+  fontFamily: string;
+  fontSize: number;
+  letterSpacing: number;
+  fontStretchPercent: number;
+};
+
+export type TypographySettings = Record<TypographyTargetKey, TypographyStyle>;
+
+export type FontOption = {
+  id: string;
+  label: string;
+  source: 'preset' | 'local';
+};
+
+export type EditCategoryKey =
+  | 'terminal'
+  | 'routeInfo'
+  | 'stationLabel'
+  | 'headerTitle'
+  | 'routeName'
+  | 'line'
+  | 'layout';
 
 export type HeaderLogoOption = {
   label: string;
@@ -121,6 +146,7 @@ export type HistorySnapshot = {
   headerLogo: HeaderLogoKey | '';
   customTerminalText: string;
   layoutOverride: LayoutOverride;
+  typographySettings: TypographySettings;
   stationOverrides: Record<string, StationOverride>;
   stationCatalog: StationListItem[];
   selectedStationId: string;
@@ -128,4 +154,3 @@ export type HistorySnapshot = {
 
 export type ExportFormat = 'svg' | 'png';
 export type MobileEditTab = 'settings' | 'layout' | 'stations';
-

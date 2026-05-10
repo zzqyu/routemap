@@ -1,4 +1,4 @@
-import type { HeaderLogoKey, HeaderLogoOption, LayoutOverride, Theme, ThemeName } from './types';
+import type { FontOption, HeaderLogoKey, HeaderLogoOption, LayoutOverride, Theme, ThemeName, TypographySettings } from './types';
 
 export const apiBase = '/api';
 export const canvasWidth = 500;
@@ -71,7 +71,23 @@ export const themes: Record<ThemeName, Theme> = {
 };
 
 export const headerLogoOptions: Record<HeaderLogoKey, HeaderLogoOption> = {
-  gbus: { label: 'G-BUS', src: '/gbus.png', x: -74, y: -8, width: 80, height: 16, titleText: '노선안내도', titleX: -4, titleY: 1, showHeaderAccent: true },
-  mbus: { label: 'M-BUS', src: '/mbus.png', x: -84, y: -14, width: 58, height: 22, titleText: '광역급행 노선안내도', titleX: -24, titleY: 1, showHeaderAccent: false },
-  public_bus: { label: '공공버스', src: '/public_bus.png', x: -59, y: -12, width: 52, height: 20, titleText: '노선안내도', titleX: -4, titleY: 1, showHeaderAccent: true },
+  gbus: { label: 'G-BUS', src: '/gbus.png', x: -66, y: -8, width: 80, height: 16, titleText: '노선안내도', titleX: 4, titleY: 1, showHeaderAccent: true },
+  mbus: { label: 'M-BUS', src: '/mbus.png', x: -72, y: -14, width: 58, height: 22, titleText: '광역급행 노선안내도', titleX: -12, titleY: 1, showHeaderAccent: false },
+  public_bus: { label: '공공버스', src: '/public_bus.png', x: -51, y: -12, width: 52, height: 20, titleText: '노선안내도', titleX: 4, titleY: 1, showHeaderAccent: true },
 };
+
+export const defaultTypographySettings: TypographySettings = {
+  terminal: { fontFamily: 'Noto Sans KR', fontSize: 10, letterSpacing: -0.5, fontStretchPercent: 80 },
+  routeInfo: { fontFamily: 'Noto Sans KR', fontSize: 4.8, letterSpacing: -0.2, fontStretchPercent: 80 },
+  stationLabel: { fontFamily: 'Noto Sans KR', fontSize: 5.5, letterSpacing: -0.24, fontStretchPercent: 80 },
+  headerTitle: { fontFamily: 'Noto Sans KR', fontSize: 13.5, letterSpacing: -0.4, fontStretchPercent: 80 },
+  routeName: { fontFamily: 'Nanum Gothic', fontSize: 34, letterSpacing: -0.3, fontStretchPercent: 90 },
+};
+
+export const presetFontFamilies: FontOption[] = [
+  { id: 'Noto Sans KR', label: 'Noto Sans KR', source: 'preset' },
+  { id: 'Nanum Gothic', label: '나눔고딕 (Nanum Gothic)', source: 'preset' },
+  { id: 'Pretendard', label: 'Pretendard', source: 'preset' },
+  { id: 'Apple SD Gothic Neo', label: 'Apple SD Gothic Neo', source: 'preset' },
+  { id: 'Malgun Gothic', label: 'Malgun Gothic', source: 'preset' },
+];

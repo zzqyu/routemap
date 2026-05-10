@@ -121,7 +121,7 @@ h2 {
 }
 
 .field:has(input[type='range']) {
-  gap: 4px;
+  gap: 0px;
 }
 
 .field-head {
@@ -219,6 +219,22 @@ h2 {
 .mini-reset:hover {
   border-color: #0050a4;
   color: #0050a4;
+}
+
+.font-license-notice {
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.font-license-notice p {
+  margin: 0;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .field input,
@@ -477,13 +493,13 @@ h2 {
 
 .station-action-row {
   display: inline-grid;
-  grid-template-columns: repeat(4, 34px);
+  grid-template-columns: repeat(4, 27px);
   gap: 8px;
   margin-left: auto;
 }
 
 .station-action-row .mini-reset {
-  min-height: 34px;
+  min-height: 27px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -491,9 +507,9 @@ h2 {
 }
 
 .station-action-row .station-action-icon {
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
+  width: 27px;
+  height: 27px;
+  min-height: 27px;
   border-radius: 8px;
   justify-self: end;
 }
@@ -1052,8 +1068,8 @@ h2 {
   }
 
   .station-action-row .station-action-icon {
-    width: 34px;
-    flex: 0 0 34px;
+    width: 27px;
+    flex: 0 0 27px;
   }
 
   .control-panel .panel-group {
