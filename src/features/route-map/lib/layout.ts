@@ -58,16 +58,16 @@ export function buildLayout(
     const rowHasPrevTurn = row > 0;
     const rowHasNextTurn = row < rowCount - 1;
     const rowVisualStart = rowHasPrevTurn
-      ? (isLeftToRight ? layoutOverride.lineStartX + layoutOverride.cornerStationGap : layoutOverride.lineEndX - layoutOverride.cornerStationGap)
+      ? (isLeftToRight ? layoutOverride.lineStartX + layoutOverride.cornerStationGapLeft : layoutOverride.lineEndX - layoutOverride.cornerStationGapRight)
       : rowStartX;
     const rowVisualEnd = rowHasNextTurn
-      ? (isLeftToRight ? layoutOverride.lineEndX - layoutOverride.cornerStationGap : layoutOverride.lineStartX + layoutOverride.cornerStationGap)
+      ? (isLeftToRight ? layoutOverride.lineEndX - layoutOverride.cornerStationGapRight : layoutOverride.lineStartX + layoutOverride.cornerStationGapLeft)
       : rowEndX;
     const rowLeft = Math.min(rowVisualStart, rowVisualEnd);
     const rowRight = Math.max(rowVisualStart, rowVisualEnd);
     const rowUsableWidth = rowRight - rowLeft;
     let xPos = isLeftToRight ? rowLeft + rowUsableWidth * progress : rowRight - rowUsableWidth * progress;
-    const yPos = headerHeight + 35 + row * layoutOverride.rowHeight;
+    const yPos = headerHeight + layoutOverride.topGuideY + row * layoutOverride.rowHeight;
     const isStart = index === 0;
     const isEnd = index === withEndpoint.length - 1;
 
@@ -152,4 +152,3 @@ export function buildRoutePath(points: StationPoint[], rowCount: number, layoutO
   }
   return path;
 }
-

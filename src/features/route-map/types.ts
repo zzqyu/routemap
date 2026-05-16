@@ -7,6 +7,7 @@ export type TypographyStyle = {
   fontFamily: string;
   fontSize: number;
   letterSpacing: number;
+  fontWeight: number;
   fontStretchPercent: number;
 };
 
@@ -131,6 +132,7 @@ export type StationOverride = {
 
 export type LayoutOverride = {
   labelAngle: number;
+  topGuideY: number;
   rowHeight: number;
   lineStrokeWidth: number;
   terminalMarkerRadius: number;
@@ -138,7 +140,8 @@ export type LayoutOverride = {
   lineStartX: number;
   lineEndX: number;
   turnRadius: number;
-  cornerStationGap: number;
+  cornerStationGapLeft: number;
+  cornerStationGapRight: number;
 };
 
 export type HistorySnapshot = {

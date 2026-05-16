@@ -17,6 +17,7 @@ export const highlightColor = '#facc15';
 
 export const defaultLayoutOverride: LayoutOverride = {
   labelAngle: -52,
+  topGuideY: 35,
   rowHeight,
   lineStrokeWidth: routeLineStrokeWidth,
   terminalMarkerRadius: 3.6,
@@ -24,7 +25,8 @@ export const defaultLayoutOverride: LayoutOverride = {
   lineStartX,
   lineEndX,
   turnRadius,
-  cornerStationGap,
+  cornerStationGapLeft: cornerStationGap,
+  cornerStationGapRight: cornerStationGap,
 };
 
 export const themes: Record<ThemeName, Theme> = {
@@ -77,14 +79,19 @@ export const headerLogoOptions: Record<HeaderLogoKey, HeaderLogoOption> = {
 };
 
 export const defaultTypographySettings: TypographySettings = {
-  terminal: { fontFamily: 'Noto Sans KR', fontSize: 10, letterSpacing: -0.5, fontStretchPercent: 80 },
-  routeInfo: { fontFamily: 'Noto Sans KR', fontSize: 4.8, letterSpacing: -0.2, fontStretchPercent: 80 },
-  stationLabel: { fontFamily: 'Noto Sans KR', fontSize: 5.5, letterSpacing: -0.24, fontStretchPercent: 80 },
-  headerTitle: { fontFamily: 'Noto Sans KR', fontSize: 13.5, letterSpacing: -0.4, fontStretchPercent: 80 },
-  routeName: { fontFamily: 'Nanum Gothic', fontSize: 34, letterSpacing: -0.3, fontStretchPercent: 90 },
+  terminal: { fontFamily: 'Noto Sans KR', fontSize: 10, letterSpacing: -0.5, fontWeight: 600, fontStretchPercent: 80 },
+  routeInfo: { fontFamily: 'Noto Sans KR', fontSize: 4.8, letterSpacing: -0.2, fontWeight: 500, fontStretchPercent: 80 },
+  stationLabel: { fontFamily: 'Noto Sans KR', fontSize: 5.5, letterSpacing: -0.24, fontWeight: 500, fontStretchPercent: 80 },
+  headerTitle: { fontFamily: 'Noto Sans KR', fontSize: 13.5, letterSpacing: -0.4, fontWeight: 800, fontStretchPercent: 80 },
+  routeName: { fontFamily: 'Nanum Gothic', fontSize: 34, letterSpacing: -0.3, fontWeight: 800, fontStretchPercent: 90 },
 };
 
 export const presetFontFamilies: FontOption[] = [
+  { id: 'system-ui', label: '기기 기본 (system-ui)', source: 'preset' },
+  { id: '-apple-system', label: 'Apple 시스템 (-apple-system)', source: 'preset' },
+  { id: 'sans-serif', label: '기본 고딕 (sans-serif)', source: 'preset' },
+  { id: 'serif', label: '기본 명조 (serif)', source: 'preset' },
+  { id: 'monospace', label: '기본 고정폭 (monospace)', source: 'preset' },
   { id: 'Noto Sans KR', label: 'Noto Sans KR', source: 'preset' },
   { id: 'Nanum Gothic', label: '나눔고딕 (Nanum Gothic)', source: 'preset' },
   { id: 'Pretendard', label: 'Pretendard', source: 'preset' },

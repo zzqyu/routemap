@@ -5,6 +5,29 @@ import { getLabelMetrics, splitStationName } from '../lib/label';
 import { canvasWidth, highlightColor, rightPad, topPadding } from '../constants';
 import type { HeaderLogoKey, HeaderLogoOption, HighlightKey, LayoutOverride, RouteDetailResponse, RouteStation, StationOverride, Theme, TypographySettings } from '../types';
 
+const genericFontFamilies = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'emoji', 'math', 'fangsong']);
+
+function toFontToken(fontFamily: string): string {
+  const value = String(fontFamily || '').trim();
+  if (!value) return '';
+  if (genericFontFamilies.has(value.toLowerCase())) return value;
+  return `'${value.replace(/'/g, "\\'")}'`;
+}
+
+function buildFontStack(primary: string): string {
+  return [
+    toFontToken(primary),
+    `'Pretendard'`,
+    `'Noto Sans KR'`,
+    `'Apple SD Gothic Neo'`,
+    `'Malgun Gothic'`,
+    `'Segoe UI'`,
+    'sans-serif',
+  ]
+    .filter(Boolean)
+    .join(',');
+}
+
 type RouteMapPreviewProps = {
   detail: RouteDetailResponse | null;
   theme: Theme;
@@ -109,7 +132,7 @@ export function RouteMapPreview({
       viewBox={`0 0 ${canvasWidth} ${layout.height}`}
       role="img"
       aria-label={`${routeName} 노선안내도`}
-      style={{ fontFamily: "'Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif" }}
+      style={{ fontFamily: buildFontStack('Pretendard') }}
     >
       <defs>
         <marker
@@ -129,10 +152,10 @@ export function RouteMapPreview({
       </defs>
       <rect x="0" y="0" width={canvasWidth} height={layout.height} fill="#fff" />
       {headerLogo.showHeaderAccent && <path d={`M 180 ${topPadding} H 320 Q 250 ${topPadding + 27} 180 ${topPadding}`} fill={theme.headerAccentColor} opacity="0.95" />}
-      <text x="14" y={topPadding + 21} fontSize="10" fontWeight="800" fill={highlightKey === 'terminal' ? highlightColor : theme.routeNumberColor}>
+      <text x="14" y={topPadding + 21} fontSize="10" fontWeight={terminalTypography.fontWeight} fill={highlightKey === 'terminal' ? highlightColor : theme.routeNumberColor}>
         <tspan
           style={{
-            fontFamily: `'${terminalTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`,
+            fontFamily: buildFontStack(terminalTypography.fontFamily),
             letterSpacing: `${terminalTypography.letterSpacing}px`,
           }}
           fontSize={terminalTypography.fontSize}
@@ -141,10 +164,10 @@ export function RouteMapPreview({
         {terminalText}
         </tspan>
       </text>
-      <text x="14" y={topPadding + 28} fontSize={routeInfoTypography.fontSize} fontWeight="700" fill="#111">
+      <text x="14" y={topPadding + 28} fontSize={routeInfoTypography.fontSize} fontWeight={routeInfoTypography.fontWeight} fill="#111">
         <tspan
           style={{
-            fontFamily: `'${routeInfoTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`,
+            fontFamily: buildFontStack(routeInfoTypography.fontFamily),
             letterSpacing: `${routeInfoTypography.letterSpacing}px`,
           }}
           transform={`scale(${routeInfoTypography.fontStretchPercent / 100} 1)`}
@@ -153,10 +176,10 @@ export function RouteMapPreview({
         </tspan>
       </text>
       {detail?.scheduleRows.map((row, index) => (
-        <text key={row.label} x="14" y={topPadding + 34 + index * 6} fontSize={routeInfoTypography.fontSize} fontWeight="700" fill="#111">
+        <text key={row.label} x="14" y={topPadding + 34 + index * 6} fontSize={routeInfoTypography.fontSize} fontWeight={routeInfoTypography.fontWeight} fill="#111">
           <tspan
             style={{
-              fontFamily: `'${routeInfoTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`,
+              fontFamily: buildFontStack(routeInfoTypography.fontFamily),
               letterSpacing: `${routeInfoTypography.letterSpacing}px`,
             }}
             transform={`scale(${routeInfoTypography.fontStretchPercent / 100} 1)`}
@@ -179,7 +202,7 @@ export function RouteMapPreview({
           height={headerLogo.height}
           preserveAspectRatio="xMidYMid meet"
         />
-        <text x={headerLogo.titleX} y={headerLogo.titleY} textAnchor="start" fontSize={headerTitleTypography.fontSize} fontWeight="900" fill="#111" dominantBaseline="middle" style={{ fontFamily: `'${headerTitleTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`, letterSpacing: `${headerTitleTypography.letterSpacing}px` }} transform={`scale(${headerTitleTypography.fontStretchPercent / 100} 1)`}>
+        <text x={headerLogo.titleX} y={headerLogo.titleY} textAnchor="start" fontSize={headerTitleTypography.fontSize} fontWeight={headerTitleTypography.fontWeight} fill="#111" dominantBaseline="middle" style={{ fontFamily: buildFontStack(headerTitleTypography.fontFamily), letterSpacing: `${headerTitleTypography.letterSpacing}px` }} transform={`scale(${headerTitleTypography.fontStretchPercent / 100} 1)`}>
           {headerLogo.titleText}
         </text>
       </g>
@@ -199,9 +222,9 @@ export function RouteMapPreview({
           y={0}
           textAnchor="end"
           fontSize={effectiveRouteNameFontSize}
-          fontWeight="900"
+          fontWeight={routeNameTypography.fontWeight}
           fill={highlightKey === 'routeName' ? highlightColor : theme.routeNumberColor}
-          style={{ fontFamily: `'${routeNameTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`, letterSpacing: `${routeNameTypography.letterSpacing}px` }}
+          style={{ fontFamily: buildFontStack(routeNameTypography.fontFamily), letterSpacing: `${routeNameTypography.letterSpacing}px` }}
         >
           {displayRouteName}
         </text>
@@ -235,7 +258,7 @@ export function RouteMapPreview({
         const override = stationOverrides[String(point.stationId)];
         const pointMode = override?.pointMode ?? (isTerminal ? 'emphasis' : 'normal');
         const isEmphasis = pointMode === 'emphasis';
-        const labelWeight = isEmphasis ? 900 : 700;
+        const labelWeight = stationTypography.fontWeight;
         const baseLabelSize = stationTypography.fontSize || label.fontSize;
         const labelSize = isEmphasis ? Math.min(6.4, baseLabelSize + 0.7) : baseLabelSize;
         const { lineHeight, baselineOffset } = getLabelMetrics(label.lines.length, labelSize);
@@ -333,7 +356,7 @@ export function RouteMapPreview({
               fontSize={labelSize}
               fontWeight={labelWeight}
               fill={highlightKey === 'labels' ? highlightColor : '#111'}
-              style={{ fontFamily: `'${stationTypography.fontFamily}','Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif`, letterSpacing: `${stationTypography.letterSpacing}px` }}
+              style={{ fontFamily: buildFontStack(stationTypography.fontFamily), letterSpacing: `${stationTypography.letterSpacing}px` }}
             >
               {label.lines.map((line, index) => (
                 <tspan key={`${point.stationId}-line-${index}`} x={labelX} dy={index === 0 ? 0 : lineHeight}>

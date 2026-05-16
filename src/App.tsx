@@ -769,7 +769,7 @@ function App() {
       });
     }
 
-    if (layoutOverride.cornerStationGap < layoutOverride.turnRadius * 0.7) {
+    if (layoutOverride.cornerStationGapLeft < layoutOverride.turnRadius * 0.7 || layoutOverride.cornerStationGapRight < layoutOverride.turnRadius * 0.7) {
       warnings.push({
         id: 'cornerGap',
         title: '유턴 구간 간섭 위험',
@@ -800,7 +800,8 @@ function App() {
       }
       return {
         ...prev,
-        cornerStationGap: Math.max(prev.cornerStationGap, Math.round(prev.turnRadius * 0.9)),
+        cornerStationGapLeft: Math.max(prev.cornerStationGapLeft, Math.round(prev.turnRadius * 0.9)),
+        cornerStationGapRight: Math.max(prev.cornerStationGapRight, Math.round(prev.turnRadius * 0.9)),
       };
     });
   }
@@ -1042,8 +1043,14 @@ function App() {
                   <span className="field-head">
                     폰트 패밀리
                     <span style={{ display: 'inline-flex', gap: 6 }}>
-                      <button type="button" className="mini-reset" onClick={loadLocalFonts} disabled={!localFontsSupported || localFontsLoaded}>
-                        {localFontsSupported ? (localFontsLoaded ? '기기폰트로드 완료' : '기기폰트로드') : '기기폰트 미지원'}
+                      <button
+                        type="button"
+                        className="mini-reset"
+                        onClick={loadLocalFonts}
+                        disabled={localFontsLoaded || !localFontsSupported}
+                        title={localFontsSupported ? '기기 폰트 목록 불러오기' : '현재 브라우저/기기에서는 Local Font Access API를 지원하지 않습니다.'}
+                      >
+                        {localFontsLoaded ? '기기폰트로드 완료' : localFontsSupported ? '기기폰트로드' : '기기폰트 미지원'}
                       </button>
                       <button
                         type="button"
@@ -1099,6 +1106,14 @@ function App() {
 
                 <label className="field">
                   <span className="field-head">
+                    폰트 굵기: {typographySettings[editCategory as keyof TypographySettings].fontWeight}
+                    <button type="button" className="mini-reset" onClick={() => updateTypography(editCategory as keyof TypographySettings, 'fontWeight', defaultTypographySettings[editCategory as keyof TypographySettings].fontWeight)}>reset</button>
+                  </span>
+                  <input type="range" min="100" max="900" step="100" value={typographySettings[editCategory as keyof TypographySettings].fontWeight} onChange={(event) => { commitHistory(); touchStage('global'); updateTypography(editCategory as keyof TypographySettings, 'fontWeight', Number(event.target.value)); }} />
+                </label>
+
+                <label className="field">
+                  <span className="field-head">
                     장평(%): {typographySettings[editCategory as keyof TypographySettings].fontStretchPercent}
                     <button type="button" className="mini-reset" onClick={() => updateTypography(editCategory as keyof TypographySettings, 'fontStretchPercent', defaultTypographySettings[editCategory as keyof TypographySettings].fontStretchPercent)}>reset</button>
                   </span>
@@ -1117,14 +1132,17 @@ function App() {
             {editCategory === 'line' && (
               <>
                 <label className="field"><span className="field-head">노선선 두께: {layoutOverride.lineStrokeWidth.toFixed(1)}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: defaultLayoutOverride.lineStrokeWidth }))}>reset</button></span><input type="range" min="2" max="6" step="0.2" value={layoutOverride.lineStrokeWidth} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStrokeWidth: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+                <label className="field"><span className="field-head">노선선 행간 간격: {layoutOverride.rowHeight}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, rowHeight: defaultLayoutOverride.rowHeight }))}>reset</button></span><input type="range" min="44" max="90" step="1" value={layoutOverride.rowHeight} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, rowHeight: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
                 <label className="field"><span className="field-head">점 크기: {layoutOverride.terminalMarkerRadius.toFixed(1)}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: defaultLayoutOverride.terminalMarkerRadius }))}>reset</button></span><input type="range" min="2.5" max="5" step="0.1" value={layoutOverride.terminalMarkerRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, terminalMarkerRadius: Number(event.target.value) })); pulseHighlight('station'); }} /></label>
                 <label className="field"><span className="field-head">유턴 반경: {layoutOverride.turnRadius}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, turnRadius: defaultLayoutOverride.turnRadius }))}>reset</button></span><input type="range" min="8" max="30" value={layoutOverride.turnRadius} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, turnRadius: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
-                <label className="field"><span className="field-head">유턴-인접정류장 간격: {layoutOverride.cornerStationGap}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, cornerStationGap: defaultLayoutOverride.cornerStationGap }))}>reset</button></span><input type="range" min="8" max="32" value={layoutOverride.cornerStationGap} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, cornerStationGap: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+                <label className="field"><span className="field-head">유턴-인접정류장 간격(좌): {layoutOverride.cornerStationGapLeft}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, cornerStationGapLeft: defaultLayoutOverride.cornerStationGapLeft }))}>reset</button></span><input type="range" min="8" max="32" value={layoutOverride.cornerStationGapLeft} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, cornerStationGapLeft: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
+                <label className="field"><span className="field-head">유턴-인접정류장 간격(우): {layoutOverride.cornerStationGapRight}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, cornerStationGapRight: defaultLayoutOverride.cornerStationGapRight }))}>reset</button></span><input type="range" min="8" max="32" value={layoutOverride.cornerStationGapRight} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, cornerStationGapRight: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
               </>
             )}
 
             {editCategory === 'layout' && (
               <>
+                <label className="field"><span className="field-head">노선도 상단 기준선: {layoutOverride.topGuideY}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, topGuideY: defaultLayoutOverride.topGuideY }))}>reset</button></span><input type="range" min="20" max="80" step="1" value={layoutOverride.topGuideY} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, topGuideY: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
                 <label className="field"><span className="field-head">좌측 기준선: {layoutOverride.lineStartX}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, lineStartX: defaultLayoutOverride.lineStartX }))}>reset</button></span><input type="range" min="8" max="120" value={layoutOverride.lineStartX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineStartX: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
                 <label className="field"><span className="field-head">우측 기준선: {layoutOverride.lineEndX}<button type="button" className="mini-reset" onClick={() => setLayoutOverride((prev) => ({ ...prev, lineEndX: defaultLayoutOverride.lineEndX }))}>reset</button></span><input type="range" min="380" max="492" value={layoutOverride.lineEndX} onChange={(event) => { touchStage('layout'); setLayoutOverride((prev) => ({ ...prev, lineEndX: Number(event.target.value) })); pulseHighlight('line'); }} /></label>
               </>
