@@ -103,7 +103,7 @@ export type StationListItem = {
   isCustom?: boolean;
 };
 
-export type StageKey = 'route' | 'global' | 'stationBasic' | 'layout' | 'stationAdvanced' | 'export';
+export type StageKey = 'route' | 'global' | 'stationBasic' | 'layout' | 'export';
 export type StageTouched = Record<StageKey, boolean>;
 
 export type LayoutWarning = {
@@ -119,6 +119,7 @@ export type StationRole = 'normal' | 'start' | 'end';
 
 export type StationOverride = {
   customName: string;
+  englishName?: string;
   omitted: boolean;
   role: StationRole;
   pointMode: StationPointMode;
@@ -132,6 +133,7 @@ export type StationOverride = {
 
 export type LayoutOverride = {
   labelAngle: number;
+  stationLabelWrapThreshold: number;
   topGuideY: number;
   rowHeight: number;
   lineStrokeWidth: number;

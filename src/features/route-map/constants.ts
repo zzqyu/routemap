@@ -17,6 +17,7 @@ export const highlightColor = '#facc15';
 
 export const defaultLayoutOverride: LayoutOverride = {
   labelAngle: -52,
+  stationLabelWrapThreshold: 11,
   topGuideY: 35,
   rowHeight,
   lineStrokeWidth: routeLineStrokeWidth,

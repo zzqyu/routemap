@@ -425,8 +425,10 @@ h2 {
   flex-direction: column;
   gap: 18px;
   padding: 28px;
+  box-sizing: border-box;
+  height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .edit-panel {
@@ -756,6 +758,9 @@ h2 {
 }
 
 .preview-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 10px;
   overflow: auto;
   padding: 24px;
   border: 1px solid #d8dde6;
@@ -908,7 +913,10 @@ h2 {
 
   .preview-panel {
     grid-area: preview;
-    padding-bottom: 14px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 10px;
   }
 
   .preview-header {
@@ -1116,7 +1124,8 @@ h2 {
 
   .preview-stage {
     padding: 5px;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .preview-zoom {

@@ -28,6 +28,16 @@ function buildFontStack(primary: string): string {
     .join(',');
 }
 
+function buildStretchTransform(x: number, y: number, fontStretchPercent: number): string {
+  const sx = Math.max(0.5, fontStretchPercent / 100);
+  return `translate(${x} ${y}) scale(${sx} 1) translate(${-x} ${-y})`;
+}
+
+function buildRotatedStretchTransform(x: number, y: number, angle: number, fontStretchPercent: number): string {
+  const sx = Math.max(0.5, fontStretchPercent / 100);
+  return `translate(${x} ${y}) rotate(${angle}) scale(${sx} 1) translate(${-x} ${-y})`;
+}
+
 type RouteMapPreviewProps = {
   detail: RouteDetailResponse | null;
   theme: Theme;
@@ -152,37 +162,56 @@ export function RouteMapPreview({
       </defs>
       <rect x="0" y="0" width={canvasWidth} height={layout.height} fill="#fff" />
       {headerLogo.showHeaderAccent && <path d={`M 180 ${topPadding} H 320 Q 250 ${topPadding + 27} 180 ${topPadding}`} fill={theme.headerAccentColor} opacity="0.95" />}
-      <text x="14" y={topPadding + 21} fontSize="10" fontWeight={terminalTypography.fontWeight} fill={highlightKey === 'terminal' ? highlightColor : theme.routeNumberColor}>
+      <text
+        x="14"
+        y={topPadding + 21}
+        fontSize="10"
+        fontWeight={terminalTypography.fontWeight}
+        fill={highlightKey === 'terminal' ? highlightColor : theme.routeNumberColor}
+        transform={buildStretchTransform(14, topPadding + 21, terminalTypography.fontStretchPercent)}
+      >
         <tspan
           style={{
             fontFamily: buildFontStack(terminalTypography.fontFamily),
             letterSpacing: `${terminalTypography.letterSpacing}px`,
           }}
           fontSize={terminalTypography.fontSize}
-          transform={`scale(${terminalTypography.fontStretchPercent / 100} 1)`}
         >
         {terminalText}
         </tspan>
       </text>
-      <text x="14" y={topPadding + 28} fontSize={routeInfoTypography.fontSize} fontWeight={routeInfoTypography.fontWeight} fill="#111">
+      <text
+        x="14"
+        y={topPadding + 28}
+        fontSize={routeInfoTypography.fontSize}
+        fontWeight={routeInfoTypography.fontWeight}
+        fill="#111"
+        transform={buildStretchTransform(14, topPadding + 28, routeInfoTypography.fontStretchPercent)}
+      >
         <tspan
           style={{
             fontFamily: buildFontStack(routeInfoTypography.fontFamily),
             letterSpacing: `${routeInfoTypography.letterSpacing}px`,
           }}
-          transform={`scale(${routeInfoTypography.fontStretchPercent / 100} 1)`}
         >
           {detail ? `운송회사: ${detail.route.companyName ?? '-'} / 문의: ${detail.route.companyTel ?? '-'}` : '노선을 선택하세요'}
         </tspan>
       </text>
       {detail?.scheduleRows.map((row, index) => (
-        <text key={row.label} x="14" y={topPadding + 34 + index * 6} fontSize={routeInfoTypography.fontSize} fontWeight={routeInfoTypography.fontWeight} fill="#111">
+        <text
+          key={row.label}
+          x="14"
+          y={topPadding + 34 + index * 6}
+          fontSize={routeInfoTypography.fontSize}
+          fontWeight={routeInfoTypography.fontWeight}
+          fill="#111"
+          transform={buildStretchTransform(14, topPadding + 34 + index * 6, routeInfoTypography.fontStretchPercent)}
+        >
           <tspan
             style={{
               fontFamily: buildFontStack(routeInfoTypography.fontFamily),
               letterSpacing: `${routeInfoTypography.letterSpacing}px`,
             }}
-            transform={`scale(${routeInfoTypography.fontStretchPercent / 100} 1)`}
           >
             {(() => {
               const [startFirst = '-', endFirst = '-'] = String(row.firstTime ?? '-|-').split('|');
@@ -202,7 +231,17 @@ export function RouteMapPreview({
           height={headerLogo.height}
           preserveAspectRatio="xMidYMid meet"
         />
-        <text x={headerLogo.titleX} y={headerLogo.titleY} textAnchor="start" fontSize={headerTitleTypography.fontSize} fontWeight={headerTitleTypography.fontWeight} fill="#111" dominantBaseline="middle" style={{ fontFamily: buildFontStack(headerTitleTypography.fontFamily), letterSpacing: `${headerTitleTypography.letterSpacing}px` }} transform={`scale(${headerTitleTypography.fontStretchPercent / 100} 1)`}>
+        <text
+          x={headerLogo.titleX}
+          y={headerLogo.titleY}
+          textAnchor="start"
+          fontSize={headerTitleTypography.fontSize}
+          fontWeight={headerTitleTypography.fontWeight}
+          fill="#111"
+          dominantBaseline="middle"
+          style={{ fontFamily: buildFontStack(headerTitleTypography.fontFamily), letterSpacing: `${headerTitleTypography.letterSpacing}px` }}
+          transform={buildStretchTransform(headerLogo.titleX, headerLogo.titleY, headerTitleTypography.fontStretchPercent)}
+        >
           {headerLogo.titleText}
         </text>
       </g>
@@ -253,7 +292,7 @@ export function RouteMapPreview({
 
       {layout.points.map((point) => {
         const markerRadius = 2.3;
-        const label = splitStationName(point.stationName);
+        const label = splitStationName(point.stationName, layoutOverride.stationLabelWrapThreshold);
         const isTerminal = point.isStart || point.isEnd;
         const override = stationOverrides[String(point.stationId)];
         const pointMode = override?.pointMode ?? (isTerminal ? 'emphasis' : 'normal');
@@ -262,6 +301,10 @@ export function RouteMapPreview({
         const baseLabelSize = stationTypography.fontSize || label.fontSize;
         const labelSize = isEmphasis ? Math.min(6.4, baseLabelSize + 0.7) : baseLabelSize;
         const { lineHeight, baselineOffset } = getLabelMetrics(label.lines.length, labelSize);
+        const englishName = String(override?.englishName ?? '').trim();
+        const englishLineDy = 3.9;
+        const angleRad = (Math.abs(layoutOverride.labelAngle) * Math.PI) / 180;
+        const englishXOffset = Math.tan(angleRad) * englishLineDy - 2.0;
         const labelX = point.xPos - 3;
         const labelY = point.yPos - 5 - baselineOffset;
         const subwayColor = override?.subwayColor ?? '#a855f7';
@@ -351,7 +394,12 @@ export function RouteMapPreview({
             <text
               x={labelX}
               y={labelY}
-              transform={`rotate(${layoutOverride.labelAngle} ${labelX} ${labelY})`}
+              transform={buildRotatedStretchTransform(
+                labelX,
+                labelY,
+                layoutOverride.labelAngle,
+                stationTypography.fontStretchPercent,
+              )}
               textAnchor="start"
               fontSize={labelSize}
               fontWeight={labelWeight}
@@ -363,6 +411,18 @@ export function RouteMapPreview({
                   {line}
                 </tspan>
               ))}
+              {englishName && (
+                <tspan
+                  x={labelX + englishXOffset}
+                  dy={englishLineDy}
+                  fontSize={4.0}
+                  fontWeight={500}
+                  fill={highlightKey === 'labels' ? highlightColor : '#475569'}
+                  style={{ letterSpacing: `${stationTypography.letterSpacing * 0.55}px` }}
+                >
+                  {englishName}
+                </tspan>
+              )}
             </text>
             {(pointMode === 'subwayTransfer' || pointMode === 'intercityTransfer') && (
               <text x={point.xPos + 5} y={point.yPos - 8} fontSize="4.2" fontWeight="900" fill="#374151">
